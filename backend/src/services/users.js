@@ -1,0 +1,6 @@
+export function userSafeSelect() {
+  return { id:true, name:true, email:true, role:true, position:true, department_lab:true, birth_date:true, phone:true, registration_source:true, verification_status:true, verified_at:true, verified_by_id:true, created_by_id:true, must_change_password:true, can_manage_items:true, can_manage_users:true, can_manage_brands:true, can_manage_locations:true, can_manage_categories:true, can_manage_statuses:true, can_manage_responsibles:true, can_approve_borrow:true };
+}
+export function userTokenPayload(user) {
+  return { id:user.id, name:user.name, email:user.email, role:user.role, position:user.position || null, department_lab:user.department_lab || null, birth_date:user.birth_date || null, phone:user.phone || null, verification_status:user.verification_status || 'verified', must_change_password:!!user.must_change_password, token_version:Number(user.token_version || 0), can_manage_items:!!user.can_manage_items, can_manage_users:!!user.can_manage_users, can_manage_brands:!!user.can_manage_brands, can_manage_locations:!!user.can_manage_locations, can_manage_categories:!!user.can_manage_categories, can_manage_statuses:!!user.can_manage_statuses, can_manage_responsibles:!!user.can_manage_responsibles, can_approve_borrow:!!user.can_approve_borrow };
+}
