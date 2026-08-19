@@ -1,0 +1,111 @@
+รายงาน Refactor Web Project — Lab QR Asset Tracker v0.8.0
+วันที่ตรวจ: 22 กรกฎาคม 2026
+
+1. ผลลัพธ์โดยสรุป / Outcome
+
+สถานะ: Partially verified
+
+โค้ด frontend และ backend ผ่านการตรวจ syntax และ routing regression tests ที่รันได้โดยไม่ใช้ฐานข้อมูล
+แก้ root cause ของ login redirect, การโหลด .env และไฟล์ HTML legacy ที่ parse ไม่ผ่านแล้ว
+ยังไม่ยืนยัน API/database end-to-end เพราะ environment ตรวจสอบติดตั้ง dependencies ไม่สำเร็จและไม่มี PostgreSQL service
+
+2. โครงสร้างหรือไฟล์ที่เปลี่ยน / Changes
+
+- backend/package.json และ package-lock.json
+  - กำหนด project version 0.8.0
+  - กำหนด Node >=20.6.0 และ npm >=9
+  - pin dependencies ให้ตรงกับ lockfile
+  - เพิ่ม check/test/verify/start scripts
+  - โหลด .env ด้วย Node --env-file สำหรับ dev/start/seed/set-passwords
+- backend/scripts/verify-project.mjs
+  - ตรวจ JavaScript, inline script และ local script/stylesheet references
+- backend/tests/routing.test.mjs
+  - ทดสอบ default route และ QR borrow redirect
+- frontend/js/router.js และ frontend/js/pages/auth.js
+  - แยก routing decision เป็น pure functions
+  - ป้องกัน blank URL สร้าง redirect ไป admin สำหรับ user โดยไม่ตั้งใจ
+  - หลีกเลี่ยงการเรียก router ซ้ำเมื่อ hashchange จะจัดการต่อเอง
+- backend/src/index.js
+  - ใช้ UPLOAD_DIR จาก environment และสร้าง directory แบบ recursive
+- frontend/index1.html
+  - เปลี่ยน legacy entry ที่เสียให้ redirect ไป entry point ปัจจุบัน
+  - เก็บต้นฉบับไว้ที่ docs/legacy-index1-corrupted.txt
+- docs/VERSIONS.md, README.md และ CHANGELOG.md
+  - เพิ่ม version matrix, คำสั่งตรวจสอบ และแก้ credential examples
+
+3. ปัญหาและสาเหตุหลัก / Root cause
+
+Blocking error 1:
+- อาการ: frontend/index1.html มี Unexpected end of input
+- สาเหตุ: ไฟล์ปะปนข้อความสนทนา โค้ดซ้ำ และ JavaScript ที่ปิด block ไม่ครบ
+- แก้: archive snapshot เดิมและแทน index1.html ด้วย compatibility redirect
+
+Blocking error 2:
+- อาการ: backend อาจแจ้งไม่พบ JWT_SECRET แม้สร้าง .env ตาม README แล้ว
+- สาเหตุ: npm scripts เรียก node โดยไม่ได้โหลด .env
+- แก้: ใช้ node --env-file=.env และกำหนด Node ขั้นต่ำ 20.6
+
+Routing regression:
+- อาการ: เปิดหน้า main โดยไม่มี hash ขณะยังไม่ login อาจเก็บ #/admin เป็น redirect แล้ว user ถูกส่งไปหน้าที่ไม่มีสิทธิ์หลัง login
+- สาเหตุ: router ใช้ #/admin เป็น default ก่อนตรวจ authentication
+- แก้: default เป็น #/login สำหรับผู้ไม่มี token และ #/admin สำหรับผู้มี token
+
+Configuration mismatch:
+- อาการ: UPLOAD_DIR มีใน .env.example แต่ backend ไม่เคยใช้
+- สาเหตุ: path uploads ถูก hardcode หลายจุด
+- แก้: resolve UPLOAD_DIR ครั้งเดียวและใช้กับ static serving, directory creation และ Multer
+
+4. Version compatibility
+
+Project: 0.8.0
+Recommended: Node.js 20 LTS, npm 10+, PostgreSQL 15/16
+Minimum declared: Node.js 20.6.0, npm 9.0.0
+Codex verification environment: Node.js 24.14.0, npm 11.9.0
+Prisma CLI: 5.22.0
+Prisma Client: 5.22.0
+Express: 4.22.2
+Multer: 1.4.5-lts.2
+bcryptjs: 3.0.3
+jsonwebtoken: 9.0.3
+qrcode: 1.5.4
+
+หมายเหตุ: static verification/tests ผ่านบน Node 24.14.0 แต่ runtime เป้าหมายที่แนะนำยังเป็น Node 20 LTS
+เพื่อความเสี่ยงต่ำกับ Prisma 5.22.0
+
+5. การตรวจสอบ / Verification
+
+PASS: ZIP ต้นฉบับ unzip -t — ไม่พบ archive corruption
+PASS: npm run verify
+PASS: verifier ตรวจ 32 JavaScript blocks/files และ 5 HTML files
+PASS: routing tests 2/2, fail 0
+PASS: package.json และ package-lock root versions ตรงกัน
+PASS: HTTP static smoke test ได้ 200 สำหรับ main HTML, item page, compatibility redirect, router, auth page script และ app.css
+PASS: ไม่พบ credential ตัวอย่างเดิม ROOT4123 และ JWT hex literal หลังแก้
+
+NOT VERIFIED:
+- npm ci: package tarball/cache extraction ล้มเหลวใน restricted environment
+- prisma validate/migrations/seed: Prisma CLI ติดตั้งไม่สมบูรณ์
+- backend API และ PostgreSQL end-to-end
+- browser click-through ของ QR → login/register → borrow → admin approval
+
+6. คำเตือนและงานคงเหลือ / Remaining items
+
+- backend/src/index.js ยังมี 950 บรรทัด ควรแยก routes/controllers/services เป็น phase ถัดไปหลังทำ API tests
+- component files หลายไฟล์และ reports.js ยังเป็น placeholders
+- CORS เปิดทุก origin และ upload ยังไม่มี file-size/type policy; ต้องกำหนดก่อน production deployment
+- default development password 000000 ต้องเปลี่ยนทันทีเมื่อใช้งานจริง
+- backup.html, frontend/index.html และ legacy snapshot ยังถูกเก็บไว้เพื่อ parity/traceability
+
+7. ขั้นตอนถัดไป / Next phase
+
+บนเครื่องที่มี PostgreSQL ให้รัน:
+1) cd backend
+2) copy .env.example .env แล้วตั้ง DATABASE_URL/JWT_SECRET
+3) npm ci
+4) npm run verify
+5) npx prisma validate
+6) npx prisma migrate deploy หรือ migrate dev ตาม environment
+7) npm run dev
+8) smoke-test QR public page, user login redirect, borrow request, document upload, admin approve และ return
+
+เมื่อ flow เหล่านี้ผ่านแล้ว จึงเริ่มแยก backend/src/index.js ทีละ route group โดยไม่เพิ่ม feature ใหม่ใน phase เดียวกัน

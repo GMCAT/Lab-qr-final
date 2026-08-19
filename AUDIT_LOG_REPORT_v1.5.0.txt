@@ -1,0 +1,34 @@
+1. ผลลัพธ์โดยสรุป / Outcome
+
+- สถานะ: Completed (ตรวจสอบแบบ static/unit แล้ว)
+- เพิ่ม Audit Log แบบ append-only สำหรับ API ที่เปลี่ยนข้อมูลสำเร็จ
+- เพิ่มหน้า #/admin/audit-logs สำหรับ Admin และ Super Admin
+
+2. โครงสร้างหรือไฟล์ที่เปลี่ยน / Changes
+
+- เพิ่ม Prisma model และ migration สำหรับ AuditLog
+- เพิ่ม middleware บันทึก actor, action, entity, route, HTTP status, IP, user-agent และข้อมูล request/result ที่ตัดข้อมูลลับแล้ว
+- เพิ่ม API แบบอ่านอย่างเดียว พร้อมตัวกรองและ pagination
+- เพิ่มหน้า UI สำหรับค้นหา กรอง เปิดดูรายละเอียด และเปลี่ยนหน้า
+
+3. ปัญหาและสาเหตุหลัก / Root cause
+
+- ก่อนหน้านี้แต่ละ workflow มีประวัติสถานะเฉพาะระบบ แต่ไม่มีบันทึกกลางสำหรับตรวจสอบกิจกรรมข้ามระบบ
+- แก้ด้วยตารางกลางและตัวบันทึก mutation สำเร็จ ทำให้เพิ่ม coverage กับ route ปัจจุบันและ route ใหม่ได้สม่ำเสมอ
+
+4. การตรวจสอบ / Verification
+
+- npm run verify: ตรวจ syntax, local references และ regression tests
+- npx prisma validate: ยังรันไม่สำเร็จใน environment นี้ เนื่องจาก npm แตก dependency tarball ไม่สมบูรณ์ ผู้ใช้ควรรันหลัง npm ci สำเร็จและมี DATABASE_URL
+- ตรวจ archive integrity และยืนยันว่าไม่มี .env/node_modules ก่อนส่งมอบ
+
+5. คำเตือนและงานคงเหลือ / Remaining items
+
+- ยังไม่ได้รัน migration และทดสอบ API กับ PostgreSQL จริงในสภาพแวดล้อมผู้ใช้
+- ยังไม่ได้ยืนยัน Prisma schema ด้วย CLI ใน environment นี้ เพราะ dependency install ล้มเหลวจาก tarball extraction
+- การเขียน Audit Log เป็น asynchronous เพื่อไม่ให้ธุรกรรมหลักล้มหลัง response สำเร็จ หากฐานข้อมูลบันทึก log ไม่ได้ server จะเขียน AUDIT_LOG_WRITE_FAILED ลง stderr
+- ข้อมูล request/result จำกัดความลึก จำนวนสมาชิก และความยาวข้อความ เพื่อลดความเสี่ยงข้อมูลขนาดใหญ่
+
+6. ขั้นตอนถัดไป / Next phase
+
+- แนะนำทำ Import Excel ต่อ โดยให้ preview/validation ก่อน commit และบันทึกผล batch เข้า Audit Log

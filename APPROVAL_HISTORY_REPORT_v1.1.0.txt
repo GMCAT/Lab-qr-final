@@ -1,0 +1,33 @@
+ผลการเพิ่มระบบปฏิเสธและประวัติการเปลี่ยนสถานะ v1.1.0
+
+1. ผลลัพธ์โดยสรุป
+- สถานะ: พัฒนาเสร็จและตรวจสอบระดับ source/test แล้ว
+- แยก approval_status และ return_status ตาม workflow เดิม
+- เพิ่มตาราง BorrowStatusHistory สำหรับ timeline แบบ append-only
+- บันทึก account id ชื่อ และเวลาเมื่ออนุมัติหรือปฏิเสธ
+- บังคับกรอกเหตุผลเมื่อปฏิเสธคำขอยืม
+
+2. โครงสร้างหรือไฟล์ที่เปลี่ยน
+- เพิ่ม Prisma model และ migration สำหรับ BorrowStatusHistory
+- เพิ่ม approved_by_id และ rejected_by_id ใน BorrowLog
+- เพิ่ม timeline ใน #/admin/borrow-history และ #/my-borrows
+- เพิ่มตัวกรองข้อความ สถานะ และวันที่ในหน้าประวัติ
+
+3. ปัญหาและสาเหตุหลัก
+- BorrowLog เดิมเก็บเฉพาะผลล่าสุด ทำให้ไม่เห็นลำดับการเปลี่ยนสถานะ
+- ชื่อผู้อนุมัติเป็นข้อความ snapshot แต่ไม่มี account id สำหรับตรวจสอบตัวตน
+- แก้โดยบันทึกเหตุการณ์ทุกครั้ง และทำ transaction ร่วมกับ BorrowLog และ Item
+
+4. การตรวจสอบ
+- npm run verify: ตรวจ syntax, HTML references และ automated tests
+- ตรวจว่าการปฏิเสธบังคับกรอกเหตุผลทั้ง API และ UI
+- ตรวจว่า core events ทั้งยืมและคืนถูกสร้างใน source
+- ยังไม่ได้ทดสอบ PostgreSQL migration และ browser E2E กับบริการจริง
+
+5. คำเตือนและงานคงเหลือ
+- ต้องสำรองฐานข้อมูลและรัน migration ก่อนใช้ v1.1.0
+- migration จะสร้าง timeline เริ่มต้นให้ข้อมูลเดิมจาก timestamp ที่มีอยู่
+- รายการเก่าบางรายการไม่มี account id จึงใช้ชื่อ snapshot และ id เป็น null
+
+6. ขั้นตอนถัดไป
+- ทดสอบ workflow pending → approved/rejected → return pending → returned และตรวจ timeline บนฐานข้อมูลทดสอบ

@@ -1,0 +1,33 @@
+ผลการปรับระบบแจ้งคืนอุปกรณ์ v1.0.0
+
+1. ผลลัพธ์โดยสรุป
+- สถานะ: พัฒนาเสร็จและตรวจสอบระดับ source/test แล้ว
+- User และ Admin สามารถแจ้งคืน พร้อมหมายเหตุ สภาพเบื้องต้น และแนบแบบฟอร์มคืน (ถ้ามี)
+- Admin ตรวจรับเป็น “ปกติ” หรือ “ชำรุด” หรือตีกลับให้แก้ไขได้
+- BorrowLog จะปิดเมื่อ Admin ตรวจรับเท่านั้น
+
+2. โครงสร้างหรือไฟล์ที่เปลี่ยน
+- เพิ่มหน้า frontend/js/pages/returns.js
+- เพิ่ม route #/my-borrows และ #/admin/return-requests
+- เพิ่ม API my-borrows, return-request, verify-return และ reject-return
+- เพิ่ม Prisma migration สำหรับสถานะและข้อมูลการตรวจรับคืน
+- คง endpoint /return เดิมไว้เป็น compatibility guard และตอบ 410 เพื่อห้ามปิดรายการโดยข้ามขั้นตอน
+
+3. ปัญหาและสาเหตุหลัก
+- ระบบเดิมให้ Admin กดคืนแล้วกำหนด return_date และสถานะ “ใช้งานได้” ทันที
+- ไม่มีสถานะคำขอคืนแยกจาก approval_status จึงไม่สามารถแสดงขั้น “รอตรวจรับคืน” ได้
+- แก้โดยเพิ่ม return_status และข้อมูลผู้แจ้ง/ผู้ตรวจ พร้อม transaction ที่อัปเดต BorrowLog และ Item พร้อมกัน
+
+4. การตรวจสอบ
+- npm run check: ตรวจ syntax JavaScript และไฟล์อ้างอิง HTML
+- npm test: ตรวจ schema, ownership guard, transaction และ frontend routes
+- npx prisma validate: ยังรันไม่ได้ เพราะ ZIP ไม่มี node_modules และ environment ไม่สามารถติดตั้ง Prisma CLI ในขั้นตอนนี้
+- ยังไม่ได้ทดสอบเชื่อม PostgreSQL จริงหรือ browser E2E เพราะไม่ได้เปิดบริการฐานข้อมูลในขั้นตอนจัดทำไฟล์
+
+5. คำเตือนและงานคงเหลือ
+- ต้องรัน Prisma migration ก่อนเริ่ม backend รุ่นนี้
+- รายการเก่าที่ไม่มี borrower_user_id จะไม่ปรากฏใน “รายการยืมของฉัน” เพื่อป้องกันข้อมูลรั่วจากผู้ใช้ชื่อซ้ำ; Admin ยังเห็นในประวัติทั้งหมด
+- แบบฟอร์มคืนเป็นไฟล์ทางเลือกตามข้อกำหนด
+
+6. ขั้นตอนถัดไป
+- รัน migration บนฐานข้อมูลสำรอง/ทดสอบ แล้ว smoke-test การแจ้งคืน ตีกลับ และตรวจรับทั้งแบบปกติและชำรุดก่อนนำขึ้น production

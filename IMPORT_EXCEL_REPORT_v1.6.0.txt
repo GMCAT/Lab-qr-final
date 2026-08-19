@@ -1,0 +1,32 @@
+1. ผลลัพธ์โดยสรุป / Outcome
+
+- สถานะ: Partially verified
+- เพิ่ม Import Excel/CSV แบบ Preview ก่อนยืนยัน และป้องกัน partial import ด้วย transaction
+- เพิ่มหน้า #/admin/import-items และ template ที่ดาวน์โหลดจากหน้าเว็บได้
+
+2. โครงสร้างหรือไฟล์ที่เปลี่ยน / Changes
+
+- เพิ่ม frontend/js/pages/importItems.js
+- เพิ่ม API /api/import/items/preview และ /api/import/items/commit
+- รองรับ 13 คอลัมน์: asset_code, name, brand, location, status, responsible_email, category, model, serial_no, size, purchase_date, price, note
+
+3. ปัญหาและสาเหตุหลัก / Root cause
+
+- การ Import โดยบันทึกทันทีเสี่ยงสร้างข้อมูลบางส่วนและ master data ที่สะกดผิด
+- แก้ด้วย server-side validation ที่ Preview และตรวจซ้ำก่อน commit โดยไม่สร้าง master data อัตโนมัติ
+
+4. การตรวจสอบ / Verification
+
+- npm run verify: syntax/local references และ regression tests
+- ตรวจ endpoint permission, row limit, duplicate detection, master-data validation และ transaction ด้วย automated tests
+- ยังไม่ได้ทดสอบกับ PostgreSQL และ browser จริง
+
+5. คำเตือนและงานคงเหลือ / Remaining items
+
+- SheetJS โหลดจาก CDN จึงต้องมีอินเทอร์เน็ตเมื่ออ่านหรือสร้าง Excel
+- responsible_email และชื่อ master data ต้องตรงกับข้อมูลในระบบ
+- template มีข้อมูลตัวอย่างหนึ่งแถว ผู้ใช้ต้องลบหรือแก้ก่อน Import
+
+6. ขั้นตอนถัดไป / Next phase
+
+- แนะนำทำ QR Batch Export ต่อ โดยรองรับตัวกรอง เลือกรายการ และ layout สำหรับพิมพ์ฉลาก

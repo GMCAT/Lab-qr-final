@@ -1,0 +1,27 @@
+รายงาน Report Dashboard และ Export v1.4.0
+
+1. ผลลัพธ์
+- เพิ่มหน้า #/admin/reports สำหรับ Admin/Super Admin
+- สรุปอุปกรณ์ คำขอ งานค้าง การยืมเกินกำหนด งานสอบเทียบ และค่าใช้จ่าย
+- กรองตามช่วงวันที่ สถานที่ หมวดหมู่ สถานะอุปกรณ์ และประเภท Maintenance
+
+2. Export
+- CSV UTF-8 พร้อม BOM รองรับภาษาไทยใน Excel
+- Excel .xlsx จำนวน 7 Sheet: Summary, Assets, Borrow_Return, Issue_Reports, Maintenance, Calibration_Due, Overdue_Borrows
+- PDF แบบ Print-ready ภาษาไทย ขนาด A4 แนวนอน
+- ทุกไฟล์ใช้ dataset และตัวกรองเดียวกับ Dashboard
+
+3. โครงสร้าง
+- GET /api/reports/dashboard เป็น read-only endpoint และใช้สิทธิ์ can_manage_items
+- frontend/js/pages/reports.js รับผิดชอบ Dashboard, charts และ exports
+- Excel ใช้ SheetJS; PDF ใช้ Browser Print / Save as PDF เพื่อรักษาฟอนต์ภาษาไทย
+
+4. การตรวจสอบ
+- npm run verify
+- ตรวจ syntax, routes, filters, report groups และชื่อ Excel Sheets
+- ยังไม่ได้ทดสอบ query กับ PostgreSQL จริงหรือกด Export ใน Browser จริง
+
+5. ก่อนใช้งาน
+- รัน npm install, npx prisma migrate deploy, npx prisma generate และ restart backend
+- เปิด Browser พร้อมอินเทอร์เน็ตเพื่อโหลด SheetJS CDN
+- อนุญาต Pop-up เมื่อ Export PDF

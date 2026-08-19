@@ -1,0 +1,28 @@
+รายงาน Ngrok UAT Patch
+เวอร์ชัน 2.1.1
+
+ผลลัพธ์
+- Backend port 3001 เสิร์ฟทั้ง Frontend และ API ผ่าน HTTPS Ngrok URL เดียว
+- PostgreSQL ยังคงเชื่อมผ่าน localhost:5432 และไม่ถูกเปิดออกอินเทอร์เน็ต
+- Frontend เลือก API origin ปัจจุบันอัตโนมัติเมื่อเปิดผ่าน Ngrok
+- โหมดพัฒนา Frontend port 5500 ยังรองรับ
+- QR ใช้ forwarded Ngrok host หรือ PUBLIC_ITEM_BASE_URL ที่กำหนด
+
+การตั้งค่าที่ต้องทำบนเครื่องผู้ใช้
+- ใส่ Ngrok Dev Domain จริงใน CORS_ORIGINS และ PUBLIC_ITEM_BASE_URL
+- ตั้ง TRUST_PROXY=true สำหรับ Ngrok
+- รักษา DATABASE_URL เป็น localhost
+- ห้ามส่ง Ngrok Authtoken หรือ JWT_SECRET ให้ผู้อื่น
+
+การตรวจสอบ
+- npm run verify
+- Prisma validate และ generate
+- npm audit --omit=dev
+- ZIP integrity และ secret exclusion
+
+สิ่งที่ยังต้องทดสอบบนเครื่องผู้ใช้
+- PostgreSQL readiness
+- HTTPS Ngrok login/registration
+- QR จากโทรศัพท์ภายนอกเครือข่าย
+- Upload/download
+- Borrow/return, issue และ maintenance workflows

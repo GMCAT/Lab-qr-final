@@ -1,0 +1,59 @@
+รายงานการปรับปรุงจากผู้ใช้งาน Lab รอบที่ 1
+เวอร์ชัน: 2.1.0
+
+1. ผลลัพธ์โดยสรุป
+
+- สถานะ: พัฒนาเสร็จและผ่านการตรวจแบบอัตโนมัติ แต่ยังต้องทดสอบกับ PostgreSQL และ Browser บนเครื่องผู้ใช้จริง
+- Sidebar แสดงทุกหน้า Admin ย่อย ย่อ/ขยายได้ และจำค่าบน Desktop
+- มุมล่าง Sidebar แสดงชื่อและอีเมลของบัญชีที่ Login
+- รวมเมนูคำขอยืม คำขอคืน และประวัติเป็นเมนูจัดการยืม-คืน
+- เพิ่ม Badge จำนวนงานที่รอดำเนินการจาก API
+- หน้า Users กรองตามแหล่งที่มาของบัญชีและสถานะการยืนยันได้
+- ผู้สมัครเองต้องรอ Admin ยืนยันก่อน Login
+- Admin/Super Admin รีเซ็ตรหัสผ่าน User ได้ และ User เปลี่ยนรหัสผ่านเองได้
+- รหัสผ่านต้องยาว 6-21 ตัวอักษร
+- บัญชีที่ผู้ดูแลสร้างใช้ 000000 เมื่อไม่ระบุ และถูกบังคับเปลี่ยนทันที
+- หน้าแรกของ User ถูกปรับให้เข้าถึงการยืม รายการแจ้งเสีย และเปลี่ยนรหัสผ่านง่ายขึ้น
+- สถานะอุปกรณ์ในหน้าแก้ไขทั่วไปเป็นแบบอ่านอย่างเดียวและเปลี่ยนผ่าน workflow เท่านั้น
+
+2. โครงสร้างหรือไฟล์ที่เปลี่ยน
+
+- เพิ่ม frontend/js/pages/adminShell.js สำหรับ Layout กลาง
+- เพิ่ม frontend/js/pages/userHome.js สำหรับหน้าแรก User
+- ปรับ frontend/js/router.js ให้หน้า Admin ย่อยใช้ Layout กลาง
+- ปรับ frontend/js/pages/users.js, auth.js, itemForm.js และ dashboardLayout.js
+- เพิ่ม field จัดการแหล่งบัญชี การยืนยัน และการบังคับเปลี่ยนรหัสผ่านใน Prisma User
+- เพิ่ม migration 20260806150000_add_user_verification_password_policy
+- เพิ่ม API change password, verify/suspend user, reset password และ notification counts
+- เพิ่ม tests/feedback-round1.test.mjs
+
+3. ปัญหาและสาเหตุหลัก
+
+- หน้า Admin ย่อย render เป็นหน้า standalone จึงไม่มี Sidebar กลาง แก้ด้วย Admin shell ที่ Router ใช้ร่วมกัน
+- User model เดิมไม่เก็บผู้สร้างหรือสถานะยืนยัน จึงกรองและอนุมัติผู้สมัครไม่ได้ แก้ด้วย field และ migration ใหม่
+- สถานะอุปกรณ์แก้ได้จากฟอร์มทั่วไป ทำให้ไม่สอดคล้องกับ Borrow/Return/Issue/Maintenance แก้โดยตัด status_id ออกจาก API update และแสดง read-only ใน UI
+
+4. การตรวจสอบ
+
+- npm run verify: ผ่าน 60/60 tests
+- Project verifier: ผ่าน JavaScript 67 blocks/files และ HTML 5 files
+- Prisma validate: ผ่านด้วย Prisma 5.22.0
+- Prisma Client generate: ผ่าน
+- npm audit --omit=dev: 0 vulnerabilities
+- Node syntax checks: ผ่าน
+
+5. คำเตือนและงานคงเหลือ
+
+- ยังไม่ได้รัน migration กับฐานข้อมูล PostgreSQL จริงของผู้ใช้
+- ยังไม่ได้ทดสอบ Browser แบบ end-to-end ด้วยบัญชี user/admin/super_admin จริง
+- ยังไม่ได้ตั้ง SMTP ดังนั้นรอบนี้ใช้การยืนยันโดย Admin ไม่ใช่ลิงก์ยืนยันอีเมล
+- ก่อนใช้งานต้องรัน Prisma migration และ restart Backend
+
+6. ขั้นตอนถัดไป
+
+1) สำรองฐานข้อมูล
+2) รัน npm install และ npx prisma migrate deploy ใน backend
+3) Restart Backend
+4) ทดสอบสมัคร User ใหม่ -> Admin ยืนยัน -> Login
+5) ทดสอบ Reset 000000 -> บังคับเปลี่ยนรหัสผ่าน
+6) ทดสอบทุกหน้า Admin ว่า Sidebar และ Badge แสดงถูกต้อง

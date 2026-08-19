@@ -1,0 +1,70 @@
+Lab QR Asset Tracker — Risk Hardening v2.2.0
+วันที่: 7 สิงหาคม 2026
+
+1. ผลลัพธ์โดยสรุป
+
+สถานะ: Completed สำหรับการแก้ความเสี่ยงลำดับเร่งด่วน และ Partially verified สำหรับ browser/UAT ที่ต้องใช้ฐานข้อมูลของผู้ใช้
+
+- Public QR ไม่ส่ง email, เบอร์โทร, วันเกิด, permission หรือประวัติยืมอีกต่อไป
+- Upload ทุกจุดที่ใช้ตัวรับไฟล์กลาง จำกัด 10 MB และรับเฉพาะ PDF/JPG/PNG/WebP โดยตรวจทั้ง MIME และนามสกุล
+- การลบอุปกรณ์เปลี่ยนเป็น Soft Delete เก็บ BorrowLog, IssueReport, Maintenance และไฟล์อ้างอิงไว้
+- Token เก่าถูกยกเลิกทันทีหลังเปลี่ยนหรือ reset password
+- การยืมและอนุมัติใช้ PostgreSQL advisory transaction lock ป้องกันคำขอพร้อมกัน
+- จำกัด request text 5,000 ตัวอักษร, array 2,000 รายการ และความลึก 12 ชั้น
+- /api/meta ส่งเฉพาะข้อมูลผู้รับผิดชอบที่จำเป็น และ /api/users จำกัดเฉพาะ Admin
+
+2. ไฟล์สำคัญที่เปลี่ยน
+
+- backend/prisma/schema.prisma
+- backend/prisma/migrations/20260807180000_risk_hardening/migration.sql
+- backend/src/config/uploads.js
+- backend/src/middlewares/auth.js
+- backend/src/middlewares/validation.js
+- backend/src/services/items.js
+- backend/src/services/users.js
+- backend/src/routes/application.routes.js
+- backend/tests/risk-hardening-v220.test.mjs
+
+3. ปัญหาและสาเหตุหลัก
+
+- Public endpoint ใช้ include ชุดเดียวกับ Admin ทำให้ข้อมูลส่วนตัวและประวัติ workflow หลุดออกไป
+  แก้ด้วย publicItemSelect แยกเฉพาะข้อมูลที่อนุญาตให้สาธารณะเห็น
+- Multer กลางไม่มี filter/limit ทำให้รับไฟล์ขนาดใหญ่หรือ active content ได้
+  แก้ด้วย allowlist MIME + extension และ file-size limit
+- DELETE Item เป็น hard delete และ relation หลายตัวใช้ Cascade
+  แก้ด้วย archived_at/archived_by_id โดยไม่ลบ record จริง
+- JWT ไม่มี server-side revocation หลัง password เปลี่ยน
+  แก้ด้วย token_version ที่ตรวจทุก authenticated request
+- การตรวจ active borrow อยู่นอก transaction จึงเกิด race condition ได้
+  แก้ด้วย transaction-scoped PostgreSQL advisory lock และตรวจสถานะซ้ำภายใน transaction
+
+4. การตรวจสอบ
+
+- Prisma schema validation: ผ่าน
+- Prisma Client generation 5.22.0: ผ่าน
+- Static verification: 74 JavaScript blocks/files และ 5 HTML files ผ่าน
+- Automated tests: 77/77 ผ่าน
+- npm audit --omit=dev: 0 vulnerabilities
+- ไม่ได้รัน migration กับฐานข้อมูลจริงของผู้ใช้
+- ไม่ได้ทำ destructive click test หรือ concurrent browser test กับ UAT จริง
+
+5. ขั้นตอนติดตั้ง
+
+1) สำรองฐานข้อมูล PostgreSQL ก่อน
+2) วาง .env ของผู้ใช้ไว้ใน backend/.env
+3) cd backend
+4) npm install
+5) npx prisma migrate deploy
+6) npx prisma generate
+7) npm run verify
+8) npm start
+
+หลัง migrate ผู้ใช้ที่ล็อกอินอยู่เดิมควรล็อกอินใหม่ หาก token เดิมไม่มี token_version หรือถูกยกเลิกจากการเปลี่ยนรหัสผ่าน
+
+6. งานคงเหลือที่ไม่บล็อก v2.2.0
+
+- ย้าย CDN/Tailwind ไปเป็นไฟล์ build แบบ self-host และใช้ CSP ที่ไม่ต้อง unsafe-inline
+- เปลี่ยน JWT ใน localStorage เป็น HttpOnly Secure SameSite cookie ต้องออกแบบ CSRF และ logout flow ร่วมกัน
+- เพิ่มการลบไฟล์จริงเมื่อฐานข้อมูล rollback หรือเมื่อแทนที่ไฟล์เดิม
+- เพิ่ม Redis rate limiter เมื่อติดตั้ง Backend หลาย instance
+- ทดสอบ backup/restore และ browser UAT บนสำเนาฐานข้อมูลก่อน Production

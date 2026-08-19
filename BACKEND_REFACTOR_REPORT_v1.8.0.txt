@@ -1,0 +1,38 @@
+1. ผลลัพธ์โดยสรุป / Outcome
+
+- สถานะ: Partially verified
+- แยก infrastructure ที่มีความเสี่ยงสูงออกจาก backend/src/index.js โดยรักษา API และ workflow เดิม
+- เพิ่ม server lifecycle ที่ปิด HTTP server และ Prisma อย่างเป็นระเบียบ
+
+2. โครงสร้างหรือไฟล์ที่เปลี่ยน / Changes
+
+- config/env.js: อ่านและตรวจ environment
+- config/uploads.js: upload storage, MIME/size policy และชื่อไฟล์ไทย
+- lib/prisma.js: Prisma singleton และ disconnect
+- middlewares/auth.js, audit.js, errors.js
+- services/items.js, users.js
+- server.js: runtime entry และ graceful shutdown
+- index.js: เหลือหน้าที่ประกอบ Express และลงทะเบียน route โดยไม่เปิด port
+
+3. ปัญหาและสาเหตุหลัก / Root cause
+
+- index.js เดิม 1,935 บรรทัดรวม environment, database, uploads, security, audit, routes และ process lifecycle
+- การรวมหลายหน้าที่ทำให้แก้ไขจุดหนึ่งกระทบ middleware order และทดสอบ app โดยไม่เปิด port ได้ยาก
+- แก้ด้วย dependency-safe extraction โดยคง route registration และ URL/payload เดิม
+
+4. การตรวจสอบ / Verification
+
+- node --check: ตรวจ index, server, config, lib, middleware และ services
+- npm run verify: ตรวจ JavaScript/HTML/local references และ regression tests ทั้งหมด
+- Architecture tests: ตรวจว่า index ไม่มี PrismaClient, multer storage, listen หรือ process.exit และตรวจ middleware order
+- ยังไม่ได้เชื่อม PostgreSQL หรือ smoke-test API ผ่าน HTTP จริงใน environment นี้
+
+5. คำเตือนและงานคงเหลือ / Remaining items
+
+- Route handlers ยังอยู่ใน index.js 1,677 บรรทัด เพื่อจำกัดความเสี่ยงใน phase นี้
+- ขั้นต่อไปควรแยก route groups พร้อม controllers/services ทีละ workflow โดยรัน tests หลังแต่ละกลุ่ม
+- Production hardening ยังไม่รวมใน refactor นี้
+
+6. ขั้นตอนถัดไป / Next phase
+
+- ทำ Backend Route Extraction: auth/items ก่อน จากนั้น borrow/return, issues/maintenance และ reports/admin

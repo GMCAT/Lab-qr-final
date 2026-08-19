@@ -1,0 +1,34 @@
+1. ผลลัพธ์โดยสรุป / Outcome
+
+- สถานะ: Partially verified
+- ย้าย handler registration ทั้ง 52 endpoints ออกจาก src/index.js สำเร็จ
+- index.js เหลือเฉพาะ Express composition และ middleware order
+
+2. โครงสร้างหรือไฟล์ที่เปลี่ยน / Changes
+
+- เพิ่ม src/routes/application.routes.js และ registerApplicationRoutes(app)
+- index.js ลดจาก 1,677 บรรทัดเหลือประมาณ 20 บรรทัด
+- feature tests อ่าน source จาก module เจ้าของ route ใหม่
+- เพิ่ม route parity test ตรวจจำนวน ความไม่ซ้ำ และ critical endpoints
+
+3. ปัญหาและสาเหตุหลัก / Root cause
+
+- แม้ infrastructure ถูกแยกใน v1.8.0 แต่ index.js ยังรวม handler ทุก workflow ทำให้ app composition และ route logic ผูกกัน
+- แก้ด้วย registrar module โดยไม่เปลี่ยน Express path หรือ middleware ที่ผูกกับแต่ละ route
+
+4. การตรวจสอบ / Verification
+
+- node --check: index.js และ application.routes.js ผ่าน
+- npm run verify: JavaScript/HTML/local references และ regression suite ผ่าน
+- route parity: 52 endpoints, method/path ไม่ซ้ำ และ critical workflows ครบ
+- ยังไม่ได้รัน HTTP smoke test กับ PostgreSQL จริง
+
+5. คำเตือนและงานคงเหลือ / Remaining items
+
+- application.routes.js ยังเป็นไฟล์ใหญ่เพื่อรักษา shared helper scope และลดความเสี่ยงในรอบนี้
+- การแบ่งเป็น auth/items/borrow/issues/maintenance/report/admin routers ควรทำหลังมี database integration tests
+- Production hardening ยังไม่รวมใน v1.9.0
+
+6. ขั้นตอนถัดไป / Next phase
+
+- ทำ Production Hardening: CORS allowlist, Helmet/security headers, rate limit, request ID, structured logging, health/readiness และ environment validation

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="รายละเอียดอุปกรณ์ห้องปฏิบัติการจาก QR Code" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="รายละเอียดอุปกรณ์ | Lab QR Asset" />
+  <meta property="og:description" content="ดูข้อมูล สถานะ และเอกสารของอุปกรณ์" />
+  <meta property="og:image" content="og-lab-asset.svg" />
+  <title>ข้อมูลอุปกรณ์ | Lab QR Asset</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Noto Sans Thai', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .glass { backdrop-filter: blur(18px); background: rgba(255,255,255,.82); }
+    .detail-row { display: grid; grid-template-columns: 120px minmax(0,1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid #eef2f7; }
+    .thumb-active { outline: 3px solid #2563eb; outline-offset: 2px; }
+    .file-link-name { overflow-wrap: anywhere; word-break: break-word; line-height: 1.45; }
+    @media (max-width: 640px) {
+      body { background: #f8fafc; }
+      .detail-row { grid-template-columns: 1fr; gap: 4px; padding: 10px 0; }
+      .mobile-gallery-panel { padding: 16px; border-radius: 24px 24px 0 0; }
+      .mobile-main-image { height: 260px; max-height: 38vh; min-height: 210px; }
+      .mobile-placeholder { height: 240px; max-height: 35vh; min-height: 200px; }
+      .mobile-qr-card { max-width: 40rem; margin-inline: auto; border-radius: 24px; box-shadow: 0 14px 30px rgba(15, 23, 42, .10); }
+      .mobile-content { padding: 20px; }
+      .mobile-thumbs { max-height: 96px; overflow-x: auto; padding-bottom: 4px; }
+      .file-link-name { max-width: 100%; }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-100 text-slate-900">
+  <main id="app" class="min-h-screen flex items-center justify-center p-4">
+    <div class="text-center text-slate-500">กำลังโหลดข้อมูลอุปกรณ์...</div>
+  </main>
+
+  <script>
+    const LOCAL_STATIC_PORTS = new Set(['5500', '5501']);
+    const IS_LOCAL_STATIC = LOCAL_STATIC_PORTS.has(window.location.port);
+    const BACKEND_ORIGIN = IS_LOCAL_STATIC ? 'http://localhost:3001' : window.location.origin;
+    const API_BASE = `${BACKEND_ORIGIN}/api`;
+
+    const qs = new URLSearchParams(location.search);
+    const assetCode = qs.get('id') || qs.get('asset_code') || location.hash.replace(/^#\/?/, '');
+    let currentImageIndex = 0;
+    let galleryImages = [];
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;'
+      }[ch]));
+    }
+
+    function absUrl(url) {
+      if (!url) return '';
+      if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+      try {
+        const parsed = new URL(url, `${BACKEND_ORIGIN}/`);
+        const isLoopback = ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname);
+        if (!IS_LOCAL_STATIC && isLoopback) {
+          return new URL(`${parsed.pathname}${parsed.search}${parsed.hash}`, `${window.location.origin}/`).toString();
+        }
+        return parsed.toString();
+      } catch (_) {
+        return '';
+      }
+    }
+
+    function formatDate(value) {
+      if (!value) return '-';
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return '-';
+      return d.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    function formatPrice(value) {
+      if (value === null || value === undefined || value === '') return '-';
+      return new Intl.NumberFormat('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(value)) + ' บาท';
+    }
+
+    function fileKind(file) {
+      const type = String(file.file_type || '').toUpperCase();
+      const name = String(file.file_name || file.file_url || '').toLowerCase();
+      if (type === 'IMAGE' || /\.(png|jpe?g|webp|gif|bmp|svg)$/.test(name)) return 'image';
+      if (type === 'MANUAL' || type === 'PDF' || /\.pdf$/.test(name)) return 'manual';
+      if (type === 'DATASHEET') return 'datasheet';
+      return 'other';
+    }
+
+    function statusClasses(name) {
+      const s = String(name || '');
+      if (s.includes('ใช้งานได้')) return 'bg-emerald-100 text-emerald-700 ring-emerald-200';
+      if (s.includes('ยืม')) return 'bg-blue-100 text-blue-700 ring-blue-200';
+      if (s.includes('ซ่อม')) return 'bg-amber-100 text-amber-700 ring-amber-200';
+      if (s.includes('บำรุง')) return 'bg-cyan-100 text-cyan-700 ring-cyan-200';
+      if (s.includes('เสีย')) return 'bg-rose-100 text-rose-700 ring-rose-200';
+      return 'bg-slate-100 text-slate-700 ring-slate-200';
+    }
+
+    async function loadItem() {
+      const app = document.getElementById('app');
+      if (!assetCode) {
+        app.innerHTML = errorBox('ไม่พบรหัสอุปกรณ์ใน URL', 'ตัวอย่าง URL: item.html?id=LAB-OSC-001');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/public/items/${encodeURIComponent(assetCode)}`);
+        if (!res.ok) {
+          let msg = `HTTP ${res.status}`;
+          try { msg = (await res.json()).error || msg; } catch (_) {}
+          throw new Error(msg);
+        }
+        const item = await res.json();
+        renderItem(item);
+      } catch (error) {
+        console.error(error);
+        app.innerHTML = errorBox('โหลดข้อมูลไม่สำเร็จ', `${escapeHtml(error.message)}<br>ตรวจว่า backend และ ngrok tunnel ยังทำงานอยู่`);
+      }
+    }
+
+    function errorBox(title, detail) {
+      return `
+        <section class="w-full max-w-lg rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+          <div class="text-4xl mb-3">⚠️</div>
+          <h1 class="text-xl font-bold text-slate-900">${title}</h1>
+          <p class="mt-2 text-sm text-slate-500 leading-6">${detail}</p>
+          <a href="index.html" class="mt-5 inline-flex rounded-2xl bg-slate-900 px-4 py-2 text-white">กลับหน้าหลัก</a>
+        </section>`;
+    }
+
+    function renderItem(item) {
+      const files = Array.isArray(item.files) ? item.files : [];
+      galleryImages = files.filter(f => fileKind(f) === 'image');
+      const manuals = files.filter(f => ['manual', 'datasheet', 'other'].includes(fileKind(f)));
+      currentImageIndex = 0;
+
+      document.getElementById('app').className = 'min-h-screen bg-slate-50 px-3 py-5 md:p-8';
+      document.getElementById('app').innerHTML = `
+        <section class="mobile-qr-card mx-auto w-full max-w-xl overflow-hidden bg-white ring-1 ring-slate-200 md:max-w-6xl md:rounded-[2rem] md:shadow-xl">
+          <div class="grid md:grid-cols-[1.05fr_.95fr]">
+            <div class="bg-slate-950 p-3 md:p-6 mobile-gallery-panel">
+              ${renderGallery(galleryImages, item)}
+            </div>
+
+            <div class="mobile-content p-5 md:p-8">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="text-sm font-semibold text-blue-600">${escapeHtml(item.asset_code)}</p>
+                  <h1 class="mt-1 text-2xl md:text-3xl font-bold tracking-tight text-slate-950">${escapeHtml(item.name)}</h1>
+                </div>
+                <span class="shrink-0 rounded-full px-3 py-1 text-sm font-semibold ring-1 ${statusClasses(item.status?.name)}">
+                  ${escapeHtml(item.status?.name || '-')}
+                </span>
+              </div>
+
+              <div class="mt-6 rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                ${row('รุ่น', item.model)}
+                ${row('ยี่ห้อ', item.brand?.name)}
+                ${row('Serial No.', item.serial_no)}
+                ${row('ขนาด', item.size)}
+                ${row('หมายเหตุ', item.note)}
+              </div>
+
+              <button id="moreBtn" onclick="toggleMore()" class="mt-5 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left font-semibold text-slate-800 shadow-sm hover:bg-slate-50">
+                <span>ดูรายละเอียดเพิ่มเติม</span>
+                <span id="moreIcon">⌄</span>
+              </button>
+
+              <div id="morePanel" class="hidden mt-4 rounded-3xl bg-white p-4 ring-1 ring-slate-200">
+                ${row('วันที่ซื้อ', formatDate(item.purchase_date))}
+                ${row('ราคา', formatPrice(item.price))}
+                ${row('ที่เก็บ', item.location?.name)}
+                ${row('ผู้รับผิดชอบ', item.responsible?.name)}
+                ${renderFiles(manuals)}
+                ${renderMaintenanceHistory(item.maintenance_jobs || [])}
+              </div>
+
+              <div class="mt-6 grid gap-3">
+                <button
+                  type="button"
+                  onclick='goBorrowFromQr(${JSON.stringify(item.asset_code)})'
+                  class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-800">
+                  🔐 สมัคร / Login เพื่อยืมอุปกรณ์
+                </button>
+                <button
+                  type="button"
+                  onclick='goIssueFromQr(${JSON.stringify(item.asset_code)})'
+                  class="inline-flex items-center justify-center rounded-2xl bg-red-600 px-5 py-3 font-semibold text-white hover:bg-red-700">
+                  ⚠️ Login เพื่อแจ้งปัญหา
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div id="lightbox" class="fixed inset-0 z-50 hidden bg-black/90 p-4" onclick="closeLightbox(event)">
+          <button class="absolute right-4 top-4 rounded-full bg-white/10 px-4 py-2 text-white" onclick="hideLightbox()">ปิด</button>
+          <button class="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 px-4 py-3 text-white text-2xl" onclick="event.stopPropagation(); prevImage()">‹</button>
+          <img id="lightboxImg" class="mx-auto h-full max-h-[90vh] w-full max-w-5xl object-contain" src="" alt="รูปอุปกรณ์" />
+          <button class="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 px-4 py-3 text-white text-2xl" onclick="event.stopPropagation(); nextImage()">›</button>
+        </div>
+      `;
+      updateGallery();
+    }
+
+    function row(label, value) {
+      return `<div class="detail-row"><dt class="text-sm font-medium text-slate-500">${escapeHtml(label)}</dt><dd class="min-w-0 text-sm font-semibold text-slate-900 break-words">${escapeHtml(value || '-')}</dd></div>`;
+    }
+
+    function renderGallery(images, item) {
+      if (!images.length) {
+        return `
+          <div class="mobile-placeholder flex md:aspect-[4/3] items-center justify-center rounded-3xl bg-slate-900 ring-1 ring-white/10">
+            <div class="text-center text-slate-400">
+              <div class="text-6xl">🔬</div>
+              <p class="mt-3 text-sm">ยังไม่มีรูปอุปกรณ์</p>
+            </div>
+          </div>`;
+      }
+      return `
+        <div class="relative overflow-hidden rounded-3xl bg-slate-900 ring-1 ring-white/10">
+          <img id="mainImage" src="" alt="${escapeHtml(item.name)}" class="mobile-main-image md:aspect-[4/3] md:h-auto w-full cursor-zoom-in object-contain" onclick="showLightbox()" />
+          <button class="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/45 px-3 py-2 text-white" onclick="prevImage()">‹</button>
+          <button class="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/45 px-3 py-2 text-white" onclick="nextImage()">›</button>
+          <div id="imageCounter" class="absolute bottom-3 right-3 rounded-full bg-black/55 px-3 py-1 text-xs font-semibold text-white"></div>
+        </div>
+        <div id="thumbs" class="mt-3 grid grid-cols-5 gap-2 md:mt-4"></div>`;
+    }
+
+    function renderFiles(files) {
+      if (!files.length) return row('คู่มือ/รูป', 'ไม่มีไฟล์แนบ');
+      const links = files.map(f => `
+        <a href="${absUrl(f.file_url)}" target="_blank" rel="noopener" class="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-slate-200 px-3 py-2 hover:bg-slate-50">
+          <span class="file-link-name min-w-0 text-sm">📄 ${escapeHtml(f.file_name || f.file_url)}</span>
+          <span class="shrink-0 text-xs font-semibold text-blue-600">เปิด</span>
+        </a>`).join('');
+      return `<div class="pt-3"><dt class="mb-2 text-sm font-medium text-slate-500">คู่มือ / Datasheet / ไฟล์แนบ</dt><dd class="space-y-2">${links}</dd></div>`;
+    }
+
+    function renderMaintenanceHistory(jobs) {
+      if (!jobs.length) return '<div class="pt-3"><dt class="mb-2 text-sm font-medium text-slate-500">ประวัติ Maintenance</dt><dd class="text-sm text-slate-400">ยังไม่มีประวัติ</dd></div>';
+      return `<div class="pt-3"><dt class="mb-2 text-sm font-medium text-slate-500">ประวัติ Maintenance / Calibration</dt><dd class="space-y-2">${jobs.map(job => `
+        <div class="rounded-2xl border border-slate-200 p-3 text-sm"><div class="flex justify-between gap-2"><b>${escapeHtml(job.title)}</b><span>${formatDate(job.completed_at)}</span></div>
+        <p class="mt-1 text-slate-500">${escapeHtml(job.work_sn)} · ${escapeHtml(job.job_type)}</p>${job.result ? `<p class="mt-1">${escapeHtml(job.result)}</p>` : ''}${job.next_due_date ? `<p class="mt-1 text-blue-700">ครั้งถัดไป: ${formatDate(job.next_due_date)}</p>` : ''}</div>`).join('')}</dd></div>`;
+    }
+
+    function updateGallery() {
+      if (!galleryImages.length) return;
+      const main = document.getElementById('mainImage');
+      const counter = document.getElementById('imageCounter');
+      const thumbs = document.getElementById('thumbs');
+      main.src = absUrl(galleryImages[currentImageIndex].file_url);
+      counter.textContent = `${currentImageIndex + 1} / ${galleryImages.length}`;
+      thumbs.innerHTML = galleryImages.map((img, i) => `
+        <button onclick="setImage(${i})" class="overflow-hidden rounded-xl bg-slate-800 ${i === currentImageIndex ? 'thumb-active' : ''}">
+          <img src="${absUrl(img.file_url)}" alt="thumbnail" class="aspect-square w-full object-cover" />
+        </button>`).join('');
+    }
+
+    function setImage(index) { currentImageIndex = index; updateGallery(); }
+    function prevImage() { if (!galleryImages.length) return; currentImageIndex = (currentImageIndex - 1 + galleryImages.length) % galleryImages.length; updateGallery(); updateLightbox(); }
+    function nextImage() { if (!galleryImages.length) return; currentImageIndex = (currentImageIndex + 1) % galleryImages.length; updateGallery(); updateLightbox(); }
+    function toggleMore() {
+      const panel = document.getElementById('morePanel');
+      const icon = document.getElementById('moreIcon');
+      panel.classList.toggle('hidden');
+      icon.textContent = panel.classList.contains('hidden') ? '⌄' : '⌃';
+    }
+    function showLightbox() { document.getElementById('lightbox').classList.remove('hidden'); updateLightbox(); }
+    function hideLightbox() { document.getElementById('lightbox').classList.add('hidden'); }
+    function closeLightbox(event) { if (event.target.id === 'lightbox') hideLightbox(); }
+    function updateLightbox() { const img = document.getElementById('lightboxImg'); if (img && galleryImages.length) img.src = absUrl(galleryImages[currentImageIndex].file_url); }
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') hideLightbox();
+      if (event.key === 'ArrowLeft') prevImage();
+      if (event.key === 'ArrowRight') nextImage();
+    });
+
+    function goBorrowFromQr(assetCode) {
+      const borrowHash = `#/borrow/${encodeURIComponent(assetCode)}`;
+      const token = localStorage.getItem('token');
+
+      if (token) {
+        window.location.href = `lab-asset-tracker.html${borrowHash}`;
+        return;
+      }
+
+      sessionStorage.setItem('redirectAfterLogin', borrowHash);
+      window.location.href = `lab-asset-tracker.html#/login`;
+    }
+
+    function goIssueFromQr(assetCode) {
+      const issueHash = `#/report-issue/${encodeURIComponent(assetCode)}`;
+      const token = localStorage.getItem('token');
+      if (token) {
+        window.location.href = `lab-asset-tracker.html${issueHash}`;
+        return;
+      }
+      sessionStorage.setItem('redirectAfterLogin', issueHash);
+      window.location.href = 'lab-asset-tracker.html#/login';
+    }
+
+    loadItem();
+  </script>
+</body>
+</html>

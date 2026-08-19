@@ -1,0 +1,83 @@
+รายงานปรับ UI — Lab QR Asset Tracker v0.9.0
+วันที่: 31 กรกฎาคม 2026
+
+1. ผลลัพธ์โดยสรุป
+
+สถานะ: Partially verified
+
+หน้า Admin Dashboard `#/admin` เปลี่ยนเป็น layout แบบ sidebar, top header, summary cards,
+donut chart, งานที่ต้องติดตาม และตารางอุปกรณ์ตามภาพอ้างอิง โดยยังคง API, route,
+role/permission, QR download และ borrow workflow เดิม
+
+2. แนวทางที่พิจารณา
+
+ทางเลือก A: เขียนทับ renderAdminDashboard เดิมโดยตรง
+- ไฟล์น้อยลง แต่เสี่ยงทำ table/filter/QR เดิมเสีย และย้อนกลับยาก
+
+ทางเลือก B: เพิ่ม dashboardLayout.js เป็น renderer ใหม่
+- แยก UI ใหม่ชัดเจน ทดสอบและย้อนกลับง่าย โดย renderer เดิมยังอยู่
+
+เลือกทางเลือก B เพราะเหมาะกับการ refactor แบบรักษาพฤติกรรม
+
+3. ไฟล์ที่เปลี่ยน
+
+- frontend/js/pages/dashboardLayout.js
+  renderer ใหม่, sidebar, summary, chart, filter, search, bulk QR modal และ mobile drawer
+- frontend/js/router.js
+  route #/admin เรียก renderAdminDashboardLayout
+- frontend/lab-asset-tracker.html
+  โหลด dashboardLayout.js หลัง dashboard.js
+- frontend/css/admin.css
+  layout, cards, chart, table, modal และ responsive styles
+- frontend/index.html
+  redirect ไป lab-asset-tracker.html#/login
+- docs/legacy-index-v0.8.0.txt
+  เก็บ index dashboard รุ่นเก่าที่เรียก API ก่อน login
+- backend/package.json และ package-lock.json
+  version 0.9.0
+- CHANGELOG.md
+  บันทึกการเปลี่ยนแปลง
+
+4. พฤติกรรมที่คงไว้
+
+- Public QR: frontend/item.html?id=<asset_code>
+- Login/Admin: frontend/lab-asset-tracker.html#/login และ #/admin
+- User role ไม่สามารถเข้าหน้า Admin
+- Admin/Super Admin เห็นเมนูตาม permission
+- คำขอยืม: #/admin/borrow-requests
+- ประวัติยืม-คืน: #/admin/borrow-history
+- Master Data: #/admin/master-data
+- User permissions: #/admin/users
+- เพิ่ม/แก้ไขอุปกรณ์, filter/search, download QR เดี่ยวและ ZIP
+
+5. การตรวจสอบ
+
+- npm run verify: ผ่าน
+- JavaScript/inline scripts/local references: ผ่าน 34 รายการและ 5 HTML files
+- Tests: ผ่าน 5/5
+- dashboardLayout.js node --check: ผ่าน
+- HTTP static smoke: ไฟล์สำคัญตอบ 200
+- Project ZIP integrity: ตรวจอีกครั้งก่อนส่ง
+
+6. ยังไม่ได้ทดสอบ
+
+- ยังไม่ได้เชื่อม PostgreSQL/API จริงใน environment นี้
+- ยังไม่ได้ browser click-through ด้วยบัญชี admin/super_admin จริง
+- พยายามทำ headless visual smoke แล้ว แต่ environment ไม่มี Chromium executable จึงไม่อ้างว่า visual E2E ผ่าน
+- donut chart ต้องใช้ Chart.js CDN ตามโครงเดิม
+
+7. ความปลอดภัยของ .env
+
+- ไม่รวม .env ใน ZIP
+- JWT_SECRET ไม่ควรมีเครื่องหมาย < >
+- ควรเปลี่ยน JWT_SECRET ใหม่ เพราะค่าปัจจุบันถูกส่งผ่านข้อความแล้ว
+- DATABASE_URL มีรหัสผ่านฐานข้อมูล ควรเก็บเฉพาะใน backend/.env และห้าม commit
+
+8. ขั้นตอนถัดไป
+
+รัน backend และ Live Server จากเครื่องผู้ใช้ จากนั้นทดสอบ:
+1) เปิด frontend/index.html ต้องไปหน้า Login
+2) Login ด้วย admin/super_admin แล้วเปิด #/admin
+3) ตรวจ desktop sidebar และ mobile drawer
+4) ทดสอบ summary filter, search, bulk QR, edit/delete
+5) ทดสอบ borrow requests และ permission ของแต่ละ role

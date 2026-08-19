@@ -1,0 +1,38 @@
+{
+  "name": "lab-qr-backend",
+  "version": "2.4.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20.6.0",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "check": "node scripts/verify-project.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "verify": "npm run check && npm test",
+    "dev": "node --env-file=.env --watch src/server.js",
+    "start": "node --env-file=.env src/server.js",
+    "migrate": "prisma migrate dev",
+    "generate": "prisma generate",
+    "seed": "node --env-file=.env prisma/seed.js",
+    "studio": "prisma studio",
+    "set-passwords": "node --env-file=.env set-default-passwords.mjs",
+    "recover-admin": "node --env-file=.env scripts/recover-super-admin.mjs",
+    "db:reset": "prisma migrate reset"
+  },
+  "dependencies": {
+    "@prisma/client": "5.22.0",
+    "bcryptjs": "3.0.3",
+    "cors": "2.8.6",
+    "express": "4.22.2",
+    "jsonwebtoken": "9.0.3",
+    "multer": "2.2.0",
+    "qrcode": "1.5.4"
+  },
+  "devDependencies": {
+    "prisma": "5.22.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  }
+}

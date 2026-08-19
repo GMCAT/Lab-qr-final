@@ -1,0 +1,54 @@
+รายงานปรับปรุงจากการทดสอบใน Lab รอบที่ 2 — Lab QR Asset Tracker v2.1.3
+วันที่: 7 สิงหาคม 2026
+
+1. ผลลัพธ์โดยสรุป
+- ปุ่มกลับจากหน้ายืมอุปกรณ์ไปที่ #/home สำหรับทุก Role
+- เปลี่ยน native alert / confirm / prompt ใน JavaScript ที่ใช้งานจริงเป็น popup กลางจอ
+- รวม Import Excel เข้าในหน้า #/admin/item/new และรักษา route เดิมด้วย redirect
+- ตัด responsible_email ออกจาก Template, frontend และ backend validation
+- รายการ Import ใช้บัญชีผู้อัปโหลดเป็นผู้รับผิดชอบ และเก็บ id, name, email ในผล Audit Log
+- จำกัดข้อความในช่องค้นหา/กรองไว้ไม่เกิน 100 ตัวอักษร
+- Report Dashboard เลือกระหว่างภาพรวมระบบกับ Audit Log ได้
+
+2. ไฟล์หลักที่เปลี่ยน
+- frontend/js/components/modal.js
+- frontend/js/pages/borrow.js
+- frontend/js/pages/importItems.js
+- frontend/js/pages/itemForm.js
+- frontend/js/pages/reports.js
+- frontend/js/pages/auditLogs.js
+- frontend/js/pages/adminShell.js และ dashboardLayout.js
+- frontend/js/router.js
+- backend/src/routes/application.routes.js
+- backend/tests/import-excel.test.mjs, report-dashboard.test.mjs และ ux-feedback-v213.test.mjs
+
+3. ปัญหาและสาเหตุหลัก
+- Popup เดิมใช้ API ของ Browser จึงมีหน้าตาไม่สม่ำเสมอและอยู่ภายใต้การควบคุมของ Browser
+- Import เดิมผูกผู้รับผิดชอบกับอีเมลในไฟล์ ทำให้ Template ซับซ้อนและข้อมูลผิดพลาดได้ง่าย
+- Import และ Audit Log แยกเป็นเมนูเดี่ยว ทำให้ขั้นตอนใช้งานกระจายหลายหน้า
+- ช่องค้นหาหลายหน้าไม่มีขีดจำกัดความยาว
+
+4. แนวทางแก้ไข
+- ใช้ dialog component กลางแบบ Promise เพื่อรองรับแจ้งเตือน ยืนยัน และรับข้อความ
+- ใช้ authenticated user จาก backend เท่านั้นสำหรับ actor และ responsible ของ Import
+- รวม Import panel ไว้ใต้ฟอร์มเพิ่มอุปกรณ์ โดย Preview และ Transaction เดิมยังทำงานเหมือนเดิม
+- ใช้ตัวเลือกประเภทรายงานเชื่อม Operational Report และ Audit Log
+- ใช้ตัวควบคุมกลางกำหนด maxlength=100 ให้ช่องค้นหา/กรองที่สร้างแบบ dynamic
+
+5. การตรวจสอบ
+- npm run verify: syntax/static verification และ regression tests
+- Prisma 5.22 validate และ generate
+- npm audit --omit=dev
+- ตรวจว่า JavaScript ที่ใช้งานจริงไม่มี native alert/confirm/prompt
+- ตรวจว่า responsible_email ไม่อยู่ใน runtime frontend/backend
+- Smoke test เส้นทาง frontend และ health endpoint
+
+6. ขอบเขตและคำเตือน
+- ไม่มีการเปลี่ยน Prisma schema และไม่ต้องรัน migration ใหม่
+- Audit Log เก็บอีเมลผู้นำเข้าใน result_data ของเหตุการณ์ Import เพื่อไม่เพิ่มข้อมูลส่วนบุคคลซ้ำในทุก Audit row
+- การตรวจ browser จริงผ่าน ngrok ต้องทำหลังแทนที่ไฟล์ Restart backend/ngrok และกด Ctrl+F5
+
+7. ขั้นตอนถัดไป
+- ทดสอบ popup ยืนยัน/กรอกข้อความอย่างน้อยหนึ่งรายการใน Users, Borrow, Return และ Maintenance
+- ทดสอบ Import ด้วย Template ใหม่ แล้วเปิด Audit Log เพื่อตรวจ imported_by
+- ทดสอบตัวเลือก Report Dashboard ทั้งภาพรวมระบบและ Audit Log

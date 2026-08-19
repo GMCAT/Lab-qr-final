@@ -1,0 +1,28 @@
+รายงานแก้ไขการส่งรายการแจ้งปัญหา v1.2.1
+
+1. ผลลัพธ์
+- แก้ปุ่มส่งรายการที่กดแล้วไม่มีการแจ้งผล
+- เมื่อส่งสำเร็จ ระบบแสดงเลขรายการและนำไปหน้า “รายการแจ้งปัญหาของฉัน”
+- หากส่งไม่สำเร็จ จะแสดงข้อความจาก API ภายในแบบฟอร์ม
+
+2. สาเหตุหลัก
+- asset_code ถูกแทรกใน inline onsubmit ซึ่งใช้เครื่องหมาย double quote ซ้อนกับ attribute HTML
+- Browser จึง parse handler ผิดและไม่ได้เรียก submitIssueReport
+- เนื่องจาก API ไม่ถูกเรียก จึงไม่มีข้อมูลใน my-issue-reports
+
+3. วิธีแก้
+- เปลี่ยนฟอร์มเป็น id="issueReportForm"
+- ผูก submit ด้วย addEventListener หลัง render
+- เพิ่มสถานะกำลังส่ง ข้อความ error และ success banner
+- เพิ่มข้อความแนะนำ migration เมื่อไม่มีตาราง IssueReport
+
+4. หมายเหตุเส้นทาง
+- #/admin/borrow-requests ใช้สำหรับคำขอยืม
+- รายการแจ้งเสียอยู่ที่ #/admin/issue-reports
+- เพิ่มลิงก์ “รายการแจ้งเสีย” ในหน้าคำขอยืมเพื่อเข้าถึงได้ง่าย
+
+5. การตรวจสอบ
+- npm run verify
+- ตรวจว่าไม่มี inline onsubmit เดิม
+- ตรวจ syntax JavaScript/HTML และ automated tests
+- ยังไม่ได้ทดสอบกับ PostgreSQL และ browser ของผู้ใช้โดยตรง

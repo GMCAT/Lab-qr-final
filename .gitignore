@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# environment
+.env
+backend/.env
+
+# uploads / runtime files
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# build/cache
+.next/
+dist/
+build/
+coverage/

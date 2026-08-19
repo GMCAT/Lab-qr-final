@@ -1,0 +1,37 @@
+รายงานแก้ไข Super Admin ระงับบัญชีตัวเอง — Lab QR Asset Tracker v2.1.4
+วันที่: 7 สิงหาคม 2026
+
+1. ผลลัพธ์โดยสรุป
+- ป้องกันการระงับบัญชีที่กำลังใช้งานอยู่ทั้ง Frontend และ Backend
+- ป้องกันการลด Role ของบัญชี Super Admin ที่กำลังใช้งาน
+- ป้องกันการระงับหรือลด Role ของ Super Admin คนสุดท้าย
+- เพิ่มคำสั่งกู้บัญชี Super Admin ที่ถูกระงับโดยไม่เปลี่ยนรหัสผ่าน
+- ไม่มีการเปลี่ยน Database schema และไม่ต้องรัน migration
+
+2. สาเหตุหลัก
+- API เปลี่ยน verification_status ของบัญชีเป้าหมายโดยไม่ตรวจว่าเป็นบัญชีเดียวกับผู้ดำเนินการ
+- หน้า Users แสดงปุ่มระงับสำหรับทุกบัญชี รวมถึงบัญชีที่กำลัง Login
+- หลังบัญชีถูกระงับ middleware ปฏิเสธ token เดิมทันที จึงเกิด API error ในหน้า Admin
+
+3. การแก้ไข
+- Backend ตอบ HTTP 409 หากพยายามระงับบัญชีตัวเอง
+- Backend นับ Super Admin ที่ verified คนอื่นก่อนอนุญาตให้ระงับหรือลด Role
+- หน้า Users ปิดปุ่มระงับและ Role selector ของบัญชีปัจจุบัน
+- เพิ่ม `npm run recover-admin -- --email <email>` โดยยอมรับเฉพาะบัญชีที่มี Role super_admin
+
+4. การกู้บัญชี
+จากโฟลเดอร์ backend รัน:
+
+  npm run recover-admin -- --email somchai@lab.com
+
+จากนั้น Restart backend และ Login ใหม่ คำสั่งนี้ไม่เปลี่ยนรหัสผ่าน
+
+5. การตรวจสอบ
+- npm run verify: ผ่าน 73/73 tests
+- Static verification: JavaScript 72 รายการ และ HTML 5 ไฟล์
+- Prisma 5.22 validate/generate ผ่าน
+- npm audit --omit=dev
+
+6. ขอบเขต
+- การทดสอบไม่ได้เชื่อมฐานข้อมูลจริงของผู้ใช้
+- คำสั่ง recovery ต้องใช้ DATABASE_URL ใน .env ที่เชื่อมฐานข้อมูลเดียวกับระบบ

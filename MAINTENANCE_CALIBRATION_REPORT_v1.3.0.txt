@@ -1,0 +1,37 @@
+รายงานระบบ Maintenance / Calibration v1.3.0
+
+1. ผลลัพธ์โดยสรุป
+- เพิ่มงานกลางสำหรับ repair, preventive, calibration และ inspection
+- รองรับ scheduled, in_progress, completed และ cancelled
+- เชื่อมสร้างงานจากรายการแจ้งเสียที่ Admin ยืนยันแล้ว
+- เก็บผู้รับผิดชอบ ผู้ให้บริการ วันที่ ค่าใช้จ่าย ผลงาน ครั้งถัดไป เอกสาร และ timeline
+
+2. โครงสร้างและหน้าที่เพิ่ม
+- MaintenanceJob, MaintenanceDocument และ MaintenanceStatusHistory
+- #/admin/maintenance
+- #/admin/maintenance/new/:asset_code
+- #/admin/maintenance/:id
+- ประวัติงานที่เสร็จแล้วในหน้า QR
+
+3. Guardrails
+- ห้ามเริ่มงานขณะอุปกรณ์ยังถูกยืม
+- ห้ามสร้างงานประเภทเดียวกันซ้ำขณะมีงานเปิด
+- ห้ามปิด Issue โดยตรงเมื่อมี Maintenance เปิดอยู่
+- เมื่อจบงาน จะคืนสถานะใช้งานได้เฉพาะเมื่อไม่มี BorrowLog, Issue หรือ Maintenance อื่นเปิดอยู่
+- งานที่เชื่อม Issue จะปิด Issue ใน transaction เดียวกัน
+
+4. การตรวจสอบ
+- npm run verify
+- ตรวจ JavaScript syntax และ HTML references
+- ตรวจ source contract ของ schema, routes, permission และ blockers
+- ยังไม่ได้ทดสอบ Prisma migration กับ PostgreSQL และ browser E2E จริง
+
+5. การติดตั้ง
+- สำรองฐานข้อมูล
+- รัน npx prisma migrate deploy
+- รัน npx prisma generate
+- restart backend และกด Ctrl+F5
+
+6. ขั้นตอนถัดไป
+- ทดสอบ repair จาก Issue และ calibration แบบไม่มี Issue
+- ตรวจเอกสาร Certificate และ next_due_date ก่อนทำ Report Dashboard

@@ -1,0 +1,32 @@
+1. ผลลัพธ์โดยสรุป / Outcome
+
+- สถานะ: Partially verified
+- เพิ่มหน้า #/admin/qr-batch สำหรับค้นหา กรอง เลือก และส่งออก QR หลายรายการ
+- รองรับ ZIP PNG และฉลาก A4 สำหรับพิมพ์หรือ Save as PDF
+
+2. โครงสร้างหรือไฟล์ที่เปลี่ยน / Changes
+
+- เพิ่ม frontend/js/pages/qrBatch.js แยกจาก Dashboard renderer เดิม
+- เพิ่ม route, navigation และ export-event API สำหรับ Audit Log
+- คง Bulk QR เดิมไว้เป็น fallback
+
+3. ปัญหาและสาเหตุหลัก / Root cause
+
+- Bulk QR เดิมผูกกับตาราง Dashboard และมีโค้ดซ้ำ จึงขยาย filter และ print layout ได้ยาก
+- แก้ด้วยหน้าเฉพาะที่ใช้ URL helper เดิม เพื่อป้องกัน QR ชี้ไปคนละหน้า
+
+4. การตรวจสอบ / Verification
+
+- npm run verify: syntax/local references และ regression tests
+- ตรวจ URL QR, permission, filter, filename sanitization, limits, ZIP และ print layout ด้วย automated tests
+- ยังไม่ได้สแกน QR จริง เปิด ZIP จริง หรือพิมพ์ผ่าน browser จริง
+
+5. คำเตือนและงานคงเหลือ / Remaining items
+
+- QRCodeJS และ JSZip โหลดจาก CDN จึงต้องมีอินเทอร์เน็ต
+- ZIP จำกัด 500 รายการ และ Print จำกัด 200 รายการต่อครั้งเพื่อควบคุม memory/browser workload
+- URL ใน QR อ้างอิง origin ของ frontend ที่เปิดใช้งาน ต้องเปิดด้วย hostname/IP ที่โทรศัพท์เข้าถึงได้ ไม่ใช่ localhost หากสแกนจากเครื่องอื่น
+
+6. ขั้นตอนถัดไป / Next phase
+
+- แนะนำ Refactor Backend แยก routes/services/validation จาก src/index.js ก่อน Production hardening

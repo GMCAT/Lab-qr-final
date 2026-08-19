@@ -1,0 +1,33 @@
+ผลการเพิ่มระบบแจ้งปัญหาอุปกรณ์ v1.2.0
+
+1. ผลลัพธ์โดยสรุป
+- สถานะ: พัฒนาเสร็จและตรวจสอบระดับ source/test แล้ว
+- User/Admin แจ้งปัญหาจากหน้า QR พร้อมรายละเอียด ระดับความรุนแรง และไฟล์แนบได้
+- รายการจะเป็น pending โดยไม่เปลี่ยนสถานะอุปกรณ์ จนกว่า Admin ยืนยัน
+- Admin เลือกยืนยันว่าเสีย ส่งซ่อม ปฏิเสธ หรือปิดงานได้
+
+2. โครงสร้างหรือไฟล์ที่เปลี่ยน
+- เพิ่ม IssueReport และ IssueStatusHistory พร้อม Prisma migration
+- เพิ่ม route #/report-issue/:asset_code, #/my-issue-reports และ #/admin/issue-reports
+- เพิ่ม API สร้างรายการ ดูรายการ ตรวจสอบ และปิดรายการ
+- เพิ่มปุ่มแจ้งปัญหาในหน้า QR
+
+3. ปัญหาและสาเหตุหลัก
+- การเปลี่ยนอุปกรณ์เป็น “เสีย” ทันทีจาก User อาจเกิดจากการแจ้งผิด
+- แก้โดยแยกรายการแจ้งออกจากสถานะ Item และให้ Admin เป็นผู้ยืนยัน
+- ป้องกันรายการเปิดซ้ำต่ออุปกรณ์ และบันทึกทุกการเปลี่ยนสถานะใน transaction
+
+4. การตรวจสอบ
+- npm run verify: ตรวจ syntax, HTML references และ automated tests
+- ตรวจ permission can_manage_items สำหรับ Admin
+- ตรวจว่า pending ไม่เปลี่ยนสถานะ Item
+- ตรวจว่า resolve ไม่เปลี่ยนเป็นใช้งานได้ หาก BorrowLog ยังเปิดอยู่
+- ยังไม่ได้ทดสอบ PostgreSQL migration และ browser E2E กับบริการจริง
+
+5. คำเตือนและงานคงเหลือ
+- ต้องสำรองฐานข้อมูลและรัน migration ก่อนใช้ v1.2.0
+- ไฟล์แนบรองรับรูปภาพหรือ PDF ขนาดไม่เกิน 10 MB
+- ระบบ Maintenance / Calibration จะเป็นขั้นถัดไปสำหรับรายละเอียดงานซ่อม
+
+6. ขั้นตอนถัดไป
+- ทดสอบ pending → confirmed, pending → repair, pending → rejected และ confirmed/repair → resolved บนฐานข้อมูลทดสอบ

@@ -1,0 +1,1072 @@
+Conversation title
+-ข่วยวาง plan โปรเจคให้หน่อย เป็นโปรเจค การตรวงสอบของด้วย Qr code โดยqr code จะติดอยู่กับอุปกรณ์แต่ละตัวในlab ในตอนแรกสิ่งที่ต้องการคือ เมื่อแสกนแล้ว จะแสดงหน้าเว็บที่ข้อมูลของอุปกรณ์นั้นๆ 
+เช่น รหัสเครื่อง,ชื่ออุปกรณ์,รุ่น,ยี่ห้อ,ขนาด,หมายเหตุ,SN เมือกด เพื่มเติม จะเห็น รหัสเครื่อง,ชื่ออุปกรณ์,รุ่น,ยี่ห้อ,ขนาด,หมายเหตุ,SN,สถานะ,คู่มือ/รูป,วันที่ซื้อ
+-การเก็บข้อมูลเก็บ ต่อ 1 ชิ้น 
+รหัสอุปกรณ์: id
+ชื่ออุปกรณ์,: เช่น Oscilloscope Keysight DSOX1204G
+รุ่น/Serial:เช่น  MY123456
+วันที่ซื้อ:เช่น  15/03/2024 
+ราคา:เช่น  45,000 บาท
+สถานะ:เช่น  ใช้งานได้ / เสีย / ส่งซ่อม
+ที่เก็บ:เช่น  ตู้ A ชั้น 3 
+ผู้รับผิดชอบ:เช่น  อ.สมชาย
+คู่มือ/รูป:เช่น  ลิงก์ไฟล์/รูป/excell/pdf ถ้ามี
+ยี่ห้อ:cisco
+ขนาด: 6U	
+หมายเหตุ: ถ้ามี
+ประวัติการยืม-คืน: ถ้ามี 
+เเต่สามารถเปลื่ยนแปลงภายหลังได้ และต้องสร้าง qr code ได้ ดาวโหลดได้    สามารถอัพไฟล์จาก excell pdf ได้  จากนั่งค่อยสร้างระบบคืนของใช้สร้างไฟล์แยก 
+
+
+
+-ใช้ PostgreSQLและต้อง ทํา normalization
+
+Today
+ได้เลย — ทำโปรเจค "ระบบตรวจสอบอุปกรณ์ในแล็บด้วย QR Code" แบบจบๆ ใช้ PostgreSQL + normalization ตามที่ขอ
+
+1. แนวคิดระบบ
+Flow หลัก
+
+แอดมิน เพิ่มข้อมูลอุปกรณ์ 1 ชิ้น = 1 record
+ระบบเจน QR Code อัตโนมัติ ผูกกับ ของอุปกรณ์ → idhttps://your-domain.com/item/UUID
+ปริ้น QR ไปติดที่เครื่อง
+คนในแล็บสแกน → เปิดเว็บหน้าแรกโชว์ข้อมูลย่อ
+กด "เพิ่มเติม" → โชว์ข้อมูลเต็ม + คู่มือ/รูป + ประวัติยืม-คืน
+อัปโหลด Excel/PDF เพื่อ import อุปกรณ์ทีละหลายชิ้นได้
+ระบบยืม-คืน แยกไฟล์/โมดูล ทำทีหลังได้
+2. Database Schema - PostgreSQL + Normalization 3NF
+แยกตารางเพื่อลด Redundancy และแก้ได้ยืดหยุ่น
+
+ตาราง
+
+ฟิลด์หลัก
+
+หน้าที่
+
+items
+
+id UUID PK, , , , , , , , , , , , , asset_codenamemodelbrand_idserial_nopurchase_datepricesizelocation_idstatus_idresponsible_user_idnotecreated_at
+
+ข้อมูลหลักอุปกรณ์ 1 ชิ้น = 1 row
+
+brands
+
+id, name
+
+ยี่ห้อ เช่น Cisco, Keysight
+
+locations
+
+id, name
+
+ที่เก็บ เช่น ตู้ A ชั้น 3
+
+statuses
+
+id, name
+
+สถานะ: ใช้งานได้, เสีย, ส่งซ่อม
+
+users
+
+id, , , nameemailrole
+
+ผู้รับผิดชอบ อ.สมชาย, แอดมิน
+
+item_files
+
+id, , , , item_id FKfile_typefile_urlfile_name
+
+คู่มือ/รูป/PDF ผูกกับอุปกรณ์ได้หลายไฟล์
+
+borrow_logs
+
+id, , , , , item_id FKborrower_nameborrow_datereturn_datenote
+
+ประวัติยืม-คืน ทำแยกโมดูลทีหลังได้
+
+ทำไมต้องแยก:
+
+brand_id, , แยกออกมา = ถ้าเปลี่ยนชื่อ "ตู้ A ชั้น 3" → "Rack A-3" แก้ที่เดียวจบlocation_idstatus_id
+item_files แยก = อุปกรณ์ 1 ตัวมีคู่มือ+รูป+datasheet ได้หลายไฟล์
+borrow_logs แยก = รองรับยืม-คืนหลายครั้ง
+3. Tech Stack แนะนำ
+Backend: Node.js + Express หรือ Next.js API Routes
+DB: PostgreSQL + Prisma ORM ช่วยเรื่อง migration ง่าย
+Frontend: Next.js + Tailwind ทำหน้าแสดงผลตอนสแกน QR ให้โหลดไวบนมือถือ
+QR Gen: ใช้ npm package เจนเป็น PNG/SVG โหลดได้qrcode
+File Upload: S3 หรือ Cloudflare R2 เก็บรูป/PDF แล้วเอา URL มาลง item_files
+Import Excel: ใช้ library อ่านไฟล์ → validate → bulk insertxlsx
+4. Plan พัฒนา 4 Phase
+Phase 1: Core MVP - 2 สัปดาห์
+
+ออกแบบ DB + รัน migration PostgreSQL
+ทำหน้า Admin CRUD อุปกรณ์: เพิ่ม/ลบ/แก้ไข
+เจน QR Code จาก → ดาวน์โหลด PNG ได้id
+หน้าสำหรับสแกน แสดงข้อมูลย่อ + ปุ่ม "เพิ่มเติม"/item/[id]
+กดเพิ่มเติมโชว์ข้อมูลเต็ม + ลิงก์ไฟล์จาก item_files
+Phase 2: Import/Export - 1 สัปดาห์
+
+อัปโหลด Excel: โหลด template → ผู้ใช้กรอก → อัปอัตโนมัติ
+อัปโหลด PDF/รูป ผูกกับ ทีละชิ้นitem_id
+Export QR Code ทั้งหมดเป็น ZIP ไฟล์
+Phase 3: ระบบยืม-คืน - 1 สัปดาห์
+
+หน้ากด "ยืม" ใสชื่อคนยืม → บันทึกลง + เปลี่ยน borrow_logsstatus_id
+หน้าคืนของ → update return_date
+ประวัติยืม-คืนแสดงในหน้า "เพิ่มเติม"
+Phase 4: เพิ่มเติม
+
+Login แอดมิน + Role แยกคนดู/คนแก้
+ค้นหาอุปกรณ์จาก SN, ชื่อ, รุ่น
+Dashboard สถิติ: ของเสียกี่ชิ้น, อยู่ระหว่างยืมกี่ชิ้น
+แจ้งเตือนอุปกรณ์ครบรอบ PM
+5. ตัวอย่างหน้าจอตอนสแกน QR
+หน้าย่อ:
+
+Code
+Oscilloscope Keysight DSOX1204G
+รหัสเครื่อง: LAB-00123
+รุ่น: DSOX1204G  SN: MY123456
+ยี่ห้อ: Keysight  ขนาด: 6U
+หมายเหตุ: ใช้สอนแล็บ 202
+[ดูเพิ่มเติม]
+
+1 line hidden
+กดเพิ่มเติมแล้วเห็น:
+
+Code
+สถานะ: ใช้งานได้
+วันที่ซื้อ: 15/03/2024  ราคา: 45,000 บาท
+ที่เก็บ: ตู้ A ชั้น 3
+ผู้รับผิดชอบ: อ.สมชาย
+คู่มือ: [PDF]  รูปอุปกรณ์: [JPG]
+ประวัติการยืม-คืน: 3 รายการ [ดู]
+
+1 line hidden
+6. เรื่องที่ต้องระวัง
+UUID vs รหัสเครื่อง: ใช้ เป็นหลักใน URL เพราะเดายาก ปลอดภัย แต่แสดง ให้คนอ่าน เช่น id UUIDasset_codeLAB-00123
+QR ถาวร: ถ้าเปลี่ยน QR จะพัง ดังนั้นห้ามแก้ หลังเจน QR แล้วidid
+สิทธิ์: หน้าสแกนควรเปิด public ได้ แต่หน้าแอดมิน/แก้ข้อมูลต้อง login
+Excel Import: ต้อง validate ว่า , , มีในระบบก่อน ไม่งั้น insert ไม่เข้าbrandlocationstatus
+อยากให้เริ่มเขียน SQL schema ของ PostgreSQL ให้เลยมั้ย? หรืออยากได้ Figma หน้าสแกนก่อน จะได้เห็นภาพว่า UX ควรเป็นยังไงตอนคนในแล็บใช้จริง
+
+Figma
+Today
+จัดให้ — นี่คือโครง Figma ที่เอาไปออกแบบต่อได้เลย สำหรับระบบสแกน QR ดูข้อมูลอุปกรณ์
+
+1. โครงสร้างไฟล์ Figma แนะนำ
+ตั้งชื่อไฟล์: Lab QR Asset System
+
+Pages ที่ต้องมี 4 หน้า:
+
+01_Mobile - Scan View - หน้าที่คนสแกน QR แล้วเห็น
+02_Admin - Dashboard - หน้าแอดมินจัดการอุปกรณ์ทั้งหมด
+03_Admin - Add/Edit Item - หน้าฟอร์มเพิ่ม/แก้อุปกรณ์ + อัปโหลดไฟล์
+04_Components - เก็บปุ่ม, Card, Input ไว้ใช้ซ้ำ
+2. 01_Mobile - Scan View สำคัญสุด
+ออกแบบ Mobile-first เพราะ 90% สแกนจากมือถือ
+
+Frame 1: หน้าย่อ /item/xxx - iPhone 14 = 390px
+
+Code
+[Header] Lab Asset Tracker
+
+[รูปอุปกรณ์] ถ้าไม่มีใช้ icon
+
+**Oscilloscope Keysight DSOX1204G**
+Chip สถานะ: [สีเขียว] ใช้งานได้
+
+รหัสเครื่อง LAB-00123
+รุ่น DSOX1204G
+SN MY123456
+ยี่ห้อ Keysight
+ขนาด 6U
+หมายเหตุ ใช้สอนแล็บ 202
+
+[ปุ่มหลัก เต็มจอ] ดูข้อมูลเพิ่มเติม ↓
+[ปุ่มรอง] ยืมอุปกรณ์
+
+สแกนเมื่อ 2 ก.ค. 2026 14:32
+
+13 lines hidden
+Frame 2: กด "ดูเพิ่มเติม" แล้วกางออก
+
+Code
+ที่เก็บ ตู้ A ชั้น 3
+ผู้รับผิดชอบ อ.สมชาย
+วันที่ซื้อ 15/03/2024
+ราคา 45,000 บาท
+
+เอกสารแนบ
+[ไอคอน PDF] คู่มือใช้งาน.pdf 2.1MB
+[ไอคอน JPG] รูปหน้าอุปกรณ์.jpg
+
+ประวัติการยืม-คืน
+→ 01/06/2026 นาย A คืนแล้ว
+→ 15/05/2026 นาย B คืนแล้ว
+[ดูทั้งหมด]
+
+[ปุ่ม] แจ้งอุปกรณ์เสีย
+
+10 lines hidden
+UX ที่ต้องมีใน Figma:
+
+ใช้ Auto Layout ทั้งหมด กดเพิ่มเติมแล้วดัน content ลงมา ไม่ทับกัน
+สถานะใช้ Chip สี: เขียว=ใช้งานได้, เหลือง=ส่งซ่อม, แดง=เสีย
+ปุ่มใหญ่ กดง่าย 48px ขึ้นไป
+ตัวหนังสือ 16px+ คนในแล็บอ่านง่าย ไม่ต้องซูม
+3. 02_Admin - Dashboard
+Frame Desktop 1440px
+
+Code
+[Sidebar] เมนู: อุปกรณ์ | นำเข้า Excel | ยืม-คืน | ตั้งค่า
+[Topbar] ค้นหา: [รหัส/SN/ชื่อ______] [+ เพิ่มอุปกรณ์ใหม่]
+
+Card สรุป: [ใช้งานได้ 142] [ส่งซ่อม 5] [เสีย 3]
+
+ตารางอุปกรณ์
+| □ | รูป | รหัสเครื่อง | ชื่อ | สถานะ | QR | Action |
+|---|-----|-----------|------|--------|----|--------|
+| □ |[img]| LAB-00123 | Oscilloscope... | ใช้งานได้ | [↓] | [แก้][ลบ] |
+| □ |[img]| LAB-00124 | Power Supply...| ส่งซ่อม | [↓] | [แก้][ลบ] |
+
+[✓ เลือกทั้งหมด] [ดาวน์โหลด QR ที่เลือกเป็น ZIP]
+[<< 1 2 3 >>]
+
+8 lines hidden
+4. 03_Admin - Add/Edit Item
+ใช้ Form 2 คอลัมน์บน Desktop, 1 คอลัมน์บน Mobile
+
+Section 1: ข้อมูลหลัก
+รหัสเครื่อง* [LAB-**__] ชื่ออุปกรณ์* [_______**]
+รุ่น [**] SN [**] ยี่ห้อ [Dropdown: Keysight▼]
+ขนาด [**] ราคา [**] วันที่ซื้อ [Date Picker]
+
+Section 2: การจัดการ
+สถานะ [ใช้งานได้▼] ที่เก็บ [ตู้ A ชั้น 3▼] ผู้รับผิดชอบ [อ.สมชาย▼]
+หมายเหตุ [Textarea___________]
+
+Section 3: ไฟล์แนบ
+
+แสดงไฟล์ที่อัปแล้ว: [ลากไฟล์มาวาง หรือกดอัปโหลด]คู่มือ.pdf [xลบ] รูป.jpg [xลบ]
+
+Footer: [บันทึก] [บันทึก + สร้าง QR] [ยกเลิก]
+
+5. 04_Components - Design System
+ทำไว้ก่อน จะได้เร็วตอนออกแบบทุกหน้า
+
+Component
+
+Variant
+
+หมายเหตุ
+
+Button
+
+Primary, Secondary, Danger, Ghost
+
+Size: L=48px, M=40px
+
+Status Chip
+
+ใช้งานได้/ส่งซ่อม/เสีย/ระหว่างยืม
+
+มีจุดสีนำหน้า
+
+Input Field
+
+Default, Error, Disabled
+
+มี Label + Helper text
+
+Item Card
+
+Compact, Expanded
+
+ใช้ในหน้าสแกน
+
+File Upload
+
+Empty, Uploading, Done
+
+แสดงชื่อไฟล์+ขนาด
+
+Table
+
+Desktop
+
+มี Checkbox, Sort
+
+สีแนะนำ:
+Primary: น้ำเงิน ไว้ใจได้
+Success: เขียว สถานะใช้งานได้
+Warning: เหลือง ส่งซ่อม
+Danger: แดง เสีย
+BG: เทาอ่อน สบายตาในแล็บ#2563EB#16A34A#F59E0B#DC2626#F8FAFC
+
+6. ทำ Prototype ใน Figma ยังไง
+ลากเส้นเชื่อม: → ใช้ ปุ่ม "ดูเพิ่มเติม"Frame ข้อมูลกางออกOn Click → Open Overlay
+ทำ ชื่อ แล้วใช้ สลับ เขียว/เหลือง/แดงง่ายๆComponentStatusVariants
+ใช้ Plugin: เทสว่า QR สแกนแล้วไปหน้าไหนจริงQR Code Generator
+ใช้ Plugin: หารูปอุปกรณ์เทสใส่ไปก่อนUnsplash
+อยากได้ตัว Prototype HTML ที่คลิกได้จริงจากโครงนี้เลยมั้ย? เดี๋ยวทำเป็นหน้าเว็บให้กด "ดูเพิ่มเติม" แล้วกางออกได้ จะได้เอาไปให้คนในแล็บเทส UX ก่อนลงมือโค้ดจริง
+
+ขอ Figma code
+Today
+Figma ไม่มี "Figma code" ตรงๆ แต่ทำได้ 2 แบบนี้ เอาไปใช้ได้เลย
+
+แบบที่ 1: ใช้ Plugin สร้างจาก Code → Figma
+เอา JSON นี้ไปใช้กับ Plugin หรือ Figma to Codehtml.to.design
+
+สเปก Figma เป็น JSON แบบย่อ: เอาไปให้ Dev มือ Figma แปลงต่อได้
+
+
+
+วางแผนโปรเจค QR code
+แบบที่ 2: Prototype HTML ที่ก็อปไปใส่ Figma ได้เลย
+อันนี้ดีสุด เอาไปเปิดใน Browser แล้วใช้ Plugin import เข้า Figma ได้ทั้งหน้า + กดได้จริงด้วยhtml.to.design
+
+Lab QR Asset Prototype [blocked]
+
+ไม่ใช่ Figma ขอเป็นเว็บจริงที่จะใช้
+Today
+ได้เลย — เครื่องมือสร้างไฟล์เมื่อกี้เอ๋อเพราะติดภาษาไทย เดี๋ยวให้โค้ดเว็บจริงไปเลย ก็อปวางเป็น แล้วรันได้ทันทีindex.html
+
+เว็บจริง Single File ใช้ได้เลย
+ไฟล์เดียวจบ มีครบ 3 หน้า + Mock data + localStorage ใช้ Tailwind CDN + Vanilla JS
+
+
+วิธีใช้
+ก็อปโค้ดทั้งหมด → เซฟเป็น index.html
+ดับเบิลคลิกเปิดใน Chrome ได้เลย ไม่ต้องมีเซิร์ฟเวอร์
+เทสหน้าสแกน: เข้า index.html#/item/a1b2c3d4-e5f6-7890-abcd-ef1234567890
+เทสหน้าแอดมิน: เข้า index.html#/admin
+ข้อมูลเก็บใน localStorage ปิดเว็บเปิดใหม่ไม่หาย
+ต่อ PostgreSQL จริงทำไง
+อันนี้เป็น Frontend ล้วน ถ้าจะต่อ DB จริง:
+
+ทำ Backend Node.js + Express 1 ไฟล์
+เปลี่ยน จาก localStorage → getDB()fetch('/api/items')
+เปลี่ยน → saveDB()fetch('/api/items', {method: 'POST'})
+ใช้ Prisma ต่อ PostgreSQL ตาม schema ที่วางไว้ก่อนหน้า
+อยากให้เขียน Backend + SQL migration ให้ต่อเลยมั้ย?
+
+ได้
+Today
+จัดให้ครับ — ต่อ Backend + PostgreSQL ให้เลย ใช้ Node.js + Express + Prisma เอาไปรันได้จริง
+
+1. โครงโปรเจค
+Code
+lab-qr-asset/
+├── backend/
+│ ├── prisma/
+│ │ └── schema.prisma
+│ ├── src/
+│ │ ├── index.js
+│ │ └── routes/
+│ │ └── items.js
+│ ├──.env
+│ └── package.json
+└── frontend/ ← เอาไฟล์ index.html เมื่อกี้ไปวาง
+
+6 lines hidden
+2. ติดตั้ง Backend
+backend/package.json
+
+
+
+วางแผนโปรเจค QR code
+backend/.env
+
+Code
+DATABASE_URL="postgresql://user:password@localhost:5432/lab_qr?schema=public"
+PORT=3001
+UPLOAD_DIR="./uploads"
+3. Prisma Schema - PostgreSQL + 3NF
+backend/prisma/schema.prisma
+
+prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+model Brand {
+  id Int @id @default(autoincrement())
+  name String @unique
+  items Item[]
+}
+
+model Location {
+  id Int @id @default(autoincrement())
+  name String @unique
+  items Item[]
+}
+
+model Status {
+  id Int @id @default(autoincrement())
+  name String @unique
+  items Item[]
+}
+
+model User {
+  id Int @id @default(autoincrement())
+  name String
+  email String? @unique
+  role String @default("staff")
+  items Item[]
+}
+
+model Item {
+  id String @id @default(uuid())
+  asset_code String @unique
+  name String
+  model String?
+  serial_no String?
+  size String?
+  note String?
+  purchase_date DateTime?
+  price Decimal? @db.Decimal(10,2)
+
+  brand_id Int
+  brand Brand @relation(fields: [brand_id], references: [id])
+
+  location_id Int
+  location Location @relation(fields: [location_id], references: [id])
+
+  status_id Int
+  status Status @relation(fields: [status_id], references: [id])
+
+  responsible_id Int
+  responsible User @relation(fields: [responsible_id], references: [id])
+
+  files ItemFile[]
+  borrow_logs BorrowLog[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([asset_code])
+  @@index([serial_no])
+}
+
+model ItemFile {
+  id Int @id @default(autoincrement())
+  item_id String
+  item Item @relation(fields: [item_id], references: [id], onDelete: Cascade)
+  file_name String
+  file_url String
+  file_type String // pdf, jpg, png
+  created_at DateTime @default(now())
+}
+
+model BorrowLog {
+  id Int @id @default(autoincrement())
+  item_id String
+  item Item @relation(fields: [item_id], references: [id], onDelete: Cascade)
+  borrower_name String
+  borrow_date DateTime @default(now())
+  return_date DateTime?
+  note String?
+}
+
+82 lines hidden
+รัน migrate:
+
+Bash
+cd backend
+npm install
+npx prisma migrate dev --name init
+4. Express API - CRUD + QR
+backend/src/index.js
+
+
+
+วางแผนโปรเจค QR code
+5. Seed ข้อมูลเริ่มต้น
+backend/prisma/seed.js
+
+
+
+วางแผนโปรเจค QR code
+รัน: npx prisma db seed
+
+6. แก้ Frontend ให้เชื่อม API
+แก้ไฟล์ index.html เมื่อกี้ เปลี่ยน 3 จุดนี้:
+
+ลบ defaultData และ getDB() ทั้งหมด
+เปลี่ยน router() เป็นแบบนี้:
+
+
+วางแผนโปรเจค QR code
+ตอน saveItem() เปลี่ยนเป็น fetch POST/PUT ไปที่ http://localhost:3001/api/items
+7. รันโปรเจค
+Bash
+# Terminal 1 - Backend
+cd backend
+npm install
+npx prisma migrate dev
+npx prisma db seed
+npm run dev
+
+# Terminal 2 - Frontend
+# เปิด index.html ด้วย Live Server หรือเปิดตรงๆก็ได้
+
+4 lines hidden
+เสร็จแล้วเข้าหน้าแอดมิน http://localhost:5500/index.html#/admin เพิ่มอุปกรณ์ แล้วเอา http://localhost:3001/api/items/{id}/qr ไปเจน QR ติดเครื่องได้เลย
+
+อยากให้ทำไฟล์ Import Excel กับระบบยืม-คืนต่อเลยมั้ย?
+
+npx prisma migrate dev --name init
+Today
+ได้เลย รันคำสั่งนี้เพื่อสร้างตารางทั้งหมดตาม schema.prisma
+
+Bash
+cd backend
+npx prisma migrate dev --name init
+สิ่งที่คำสั่งนี้ทำ:
+
+อ่าน schema.prisma แล้วสร้าง SQL migration ไฟล์ใน prisma/migrations/
+รัน SQL สร้างตาราง brands, locations, statuses, users, items, item_files, borrow_logs ใน PostgreSQL
+รัน prisma generate ให้อัตโนมัติ ได้ PrismaClient มาใช้ในโค้ด
+หลังรันเสร็จ ให้ทำต่อ 2 อย่างนี้:
+
+1. Seed ข้อมูลเริ่มต้น
+เพิ่มใน backend/package.json
+
+
+
+วางแผนโปรเจค QR code
+แล้วรัน:
+
+Bash
+npx prisma db seed
+จะได้ Status, Brand, Location, User เริ่มต้นสำหรับ dropdown
+
+2. เช็คว่าตารางมาครบมั้ย
+Bash
+npx prisma studio
+จะเปิดหน้าเว็บ http://localhost:5555 ให้ดู DB แบบ GUI เช็คตาราง + เพิ่มข้อมูลเทสได้
+
+ถ้ารันแล้ว Error แบบนี้:
+
+Error
+
+[Archived corrupted legacy snapshot — not an application entry point]
+
+แก้ยังไง
+
+P1001: Can't reach database
+
+เช็ค DATABASE_URL ใน .env ว่า user/pass/db ถูกมั้ย และ Postgres รันอยู่
+
+P3009: failed migrations
+
+ลบโฟลเดอร์ prisma/migrations แล้วรันใหม่
+
+Environment variable not found: DATABASE_URL
+
+สร้างไฟล์ .env ใน backend/ ใส่ DATABASE_URL="postgresql://postgres:1234@localhost:5432/lab_qr"
+
+รัน migrate dev ผ่านแล้วบอกนะ เดี๋ยวพาต่อ API + เชื่อม Frontend เลย
+
+
+
+Ask Meta AI...
+วางแผนโปรเจค QR code
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab QR Asset Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <style>
+    body { font-family: 'Noto Sans Thai', system-ui, sans-serif; }
+   .btn { @apply px-6 py-3 rounded-lg font-semibold text-base transition-all active:scale-95; }
+   .btn-primary { @apply bg-[#2563EB] text-white hover:bg-blue-700; }
+   .btn-secondary { @apply bg-gray-200 text-gray-800 hover:bg-gray-300; }
+   .btn-danger { @apply bg-[#DC2626] text-white hover:bg-red-700; }
+   .chip { @apply px-3 py-1 rounded-full text-sm font-semibold inline-flex items-center gap-1; }
+  </style>
+</head>
+<body class="bg-[#F8FAFC] text-gray-900">
+
+<div id="app"></div>
+
+<script>
+const DB_KEY = 'lab_qr_assets';
+
+
+
+// const defaultData = {
+//   items: [
+//     {
+//       id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+//       asset_code: 'LAB-00123',
+//       name: 'Oscilloscope Keysight DSOX1204G',
+//       model: 'DSOX1204G',
+//       serial_no: 'MY123456',
+//       brand: 'Keysight',
+//       size: '6U',
+//       note: 'ใช้สอนแล็บ 202',
+//       purchase_date: '2024-03-15',
+//       price: 45000,
+//       status: 'ใช้งานได้',
+//       location: 'ตู้ A ชั้น 3',
+//       responsible: 'อ.สมชาย',
+//       files: [
+//         { name: 'คู่มือใช้งาน.pdf', url: '#', type: 'pdf' },
+//         { name: 'รูปหน้าอุปกรณ์.jpg', url: 'https://placehold.co/600x400', type: 'jpg' }
+//       ],
+//       borrow_logs: [
+//         { date: '2026-06-01', borrower: 'นาย A', return_date: '2026-06-03' },
+//         { date: '2026-05-15', borrower: 'นาย B', return_date: '2026-05-20' }
+//       ]
+//     }
+//   ],
+//   brands: ['Keysight', 'Cisco', 'Rohde&Schwarz'],
+//   locations: ['ตู้ A ชั้น 3', 'ตู้ B ชั้น 2', 'ห้องเก็บของ'],
+//   statuses: ['ใช้งานได้', 'ส่งซ่อม', 'เสีย', 'ระหว่างยืม'],
+//   users: ['อ.สมชาย', 'อ.สมหญิง', 'เจ้าหน้าที่แล็บ']
+// };
+
+// function getDB() {
+//   const data = localStorage.getItem(DB_KEY);
+//   return data? JSON.parse(data) : defaultData;
+// }
+
+
+
+
+
+
+// function saveDB(db) {
+//   localStorage.setItem(DB_KEY, JSON.stringify(db));
+// }
+
+function getStatusColor(status) {
+  const colors = {
+    'ใช้งานได้': 'bg-[#16A34A] text-white',
+    'ส่งซ่อม': 'bg-[#F59E0B] text-white',
+    'เสีย': 'bg-[#DC2626] text-white',
+    'ระหว่างยืม': 'bg-blue-500 text-white'
+  };
+  return colors[status] || 'bg-gray-400 text-white';
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  return `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+}
+
+function formatPrice(price) {
+  if (!price) return '-';
+  return new Intl.NumberFormat('th-TH').format(price) + ' บาท';
+}
+
+// ROUTER
+async function router() {
+  const hash = location.hash || '#/';
+  const app = document.getElementById('app');
+
+  if (hash.startsWith('#/item/')) {
+   const hash = location.hash || '#/';
+  const app = document.getElementById('app');
+
+  if (hash.startsWith('#/item/')) {
+    const id = hash.split('/')[2];
+    try {
+      const res = await fetch(`http://localhost:3001/api/items/${id}`);
+      if (!res.ok) throw new Error('Not found');
+      const item = await res.json();
+      renderItemView(app, item); // ส่ง object ไปเลย ไม่ต้องส่ง id แล้ว
+    } catch (e) {
+      app.innerHTML = `<div class="p-6 text-center text-red-500 font-bold">ไม่พบอุปกรณ์ในระบบ</div>`;
+    }
+  } else if (hash === '#/admin') {
+    const res = await fetch('http://localhost:3001/api/items');
+    const items = await res.json();
+    renderAdminDashboard(app, items); // ส่ง array items ไปเลย
+  } else if (hash.startsWith('#/admin/item/')) {
+    const id = hash.split('/')[3];
+    renderAdminForm(app, id);
+  } else {
+    location.hash = '#/admin';
+  }
+  }
+
+
+
+// VIEW: ITEM SCAN - Mobile first
+
+//   app.innerHTML = `
+//     <div class="max-w-md mx-auto min-h-screen bg-white">
+//       <header class="p-4 border-b sticky top-0 bg-white z-10">
+//         <h1 class="text-xl font-bold">Lab Asset Tracker</h1>
+//       </header>
+
+//       <div class="p-4">
+//         <img src="${item.files.find(f=>f.type==='jpg')?.url || 'https://placehold.co/600x400'}"
+//              class="w-full h-52 object-cover rounded-xl mb-4" alt="${item.name}">
+
+//         <h2 class="text-2xl font-bold mb-2">${item.name}</h2>
+//         <div class="mb-4">
+//           <span class="chip ${getStatusColor(item.status)}">
+//             <span class="w-2 h-2 rounded-full bg-white"></span>${item.status}
+//           </span>
+//         </div>
+
+//         <div class="space-y-3 text-base mb-6">
+//           ${row('รหัสเครื่อง', item.asset_code)}
+//           ${row('รุ่น', item.model)}
+//           ${row('SN', item.serial_no)}
+//           ${row('ยี่ห้อ', item.brand)}
+//           ${row('ขนาด', item.size)}
+//           ${row('หมายเหตุ', item.note)}
+//         </div>
+
+//         <button onclick="toggleDetail()" id="detailBtn" class="btn btn-primary w-full mb-3">
+//           ดูข้อมูลเพิ่มเติม ↓
+//         </button>
+
+//         <div id="detailSection" class="hidden space-y-3 text-base mb-6 border-t pt-4">
+//           ${row('ที่เก็บ', item.location)}
+//           ${row('ผู้รับผิดชอบ', item.responsible)}
+//           ${row('วันที่ซื้อ', formatDate(item.purchase_date))}
+//           ${row('ราคา', formatPrice(item.price))}
+
+//           <div class="pt-2">
+//             <p class="text-gray-500 mb-2">เอกสารแนบ</p>
+//             ${item.files.map(f => `
+//               <a href="${f.url}" class="flex items-center gap-2 p-3 bg-gray-50 rounded-lg mb-2">
+//                 <span>${f.type === 'pdf'? '📄' : '🖼️'}</span>
+//                 <span class="text-[#2563EB] font-semibold">${f.name}</span>
+//               </a>
+//             `).join('')}
+//           </div>
+
+//           <div class="pt-2">
+//             <p class="text-gray-500 mb-2">ประวัติการยืม-คืน</p>
+//             ${item.borrow_logs.slice(0,2).map(log => `
+//               <div class="text-sm p-2 bg-gray-50 rounded mb-1">
+//                 → ${formatDate(log.date)} ${log.borrower} ${log.return_date? 'คืนแล้ว' : 'ยังไม่คืน'}
+//               </div>
+//             `).join('')}
+//           </div>
+//         </div>
+
+//         <div class="grid grid-cols-2 gap-3">
+//           <button class="btn btn-secondary">ยืมอุปกรณ์</button>
+//           <button class="btn btn-danger">แจ้งเสีย</button>
+//         </div>
+//       </div>
+//     </div>
+//   `;
+// }
+
+
+function renderItemView(app, item) {
+  // ดึงชื่อสถานะ ยี่ห้อ จาก Object ที่ Prisma ส่งมา
+  const statusName = item.status?.name || 'ไม่ระบุ';
+  const brandName = item.brand?.name || '-';
+  const locationName = item.location?.name || '-';
+  const responsibleName = item.responsible?.name || '-';
+
+  app.innerHTML = `
+    <div class="max-w-md mx-auto min-h-screen bg-white">
+      <header class="p-4 border-b sticky top-0 bg-white z-10">
+        <h1 class="text-xl font-bold">Lab Asset Tracker</h1>
+      </header>
+
+      <div class="p-4">
+        <img src="${item.files?.find(f=>f.file_type==='jpg')?.file_url || 'https://placehold.co/600x400'}"
+             class="w-full h-52 object-cover rounded-xl mb-4" alt="${item.name}">
+
+        <h2 class="text-2xl font-bold mb-2">${item.name}</h2>
+        <div class="mb-4">
+          <span class="chip ${getStatusColor(statusName)} px-3 py-1 rounded-full text-sm font-semibold">
+            ${statusName}
+          </span>
+        </div>
+
+        <div class="space-y-3 text-base mb-6">
+          ${row('รหัสเครื่อง', item.asset_code)}
+          ${row('รุ่น', item.model)}
+          ${row('SN', item.serial_no)}
+          ${row('ยี่ห้อ', brandName)}
+          ${row('ขนาด', item.size)}
+          ${row('หมายเหตุ', item.note)}
+        </div>
+
+        <button onclick="toggleDetail()" id="detailBtn" class="w-full mb-3 py-3 bg-blue-600 text-white rounded-lg font-semibold">
+          ดูข้อมูลเพิ่มเติม ↓
+        </button>
+
+        <div id="detailSection" class="hidden space-y-3 text-base mb-6 border-t pt-4">
+          ${row('ที่เก็บ', locationName)}
+          ${row('ผู้รับผิดชอบ', responsibleName)}
+          ${row('วันที่ซื้อ', formatDate(item.purchase_date))}
+          ${row('ราคา', formatPrice(item.price))}
+
+          <div class="pt-2">
+            <p class="text-gray-500 mb-2">ประวัติการยืม-คืน (ล่าสุด)</p>
+            ${item.borrow_logs?.length > 0 ? item.borrow_logs.slice(0,2).map(log => `
+              <div class="text-sm p-2 bg-gray-50 rounded mb-1">
+                → ${formatDate(log.borrow_date)} ${log.borrower_name} ${log.return_date ? 'คืนแล้ว' : 'ยังไม่คืน'}
+              </div>
+            `).join('') : '<p class="text-sm text-gray-400">ยังไม่มีประวัติ</p>'}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function row(label, value) {
+  return `
+    <div class="flex justify-between">
+      <span class="text-gray-500">${label}</span>
+      <span class="font-semibold text-right">${value || '-'}</span>
+    </div>
+  `;
+}
+
+function toggleDetail() {
+  const sec = document.getElementById('detailSection');
+  const btn = document.getElementById('detailBtn');
+  sec.classList.toggle('hidden');
+  btn.textContent = sec.classList.contains('hidden')? 'ดูข้อมูลเพิ่มเติม ↓' : 'ซ่อนข้อมูล ↑';
+}
+
+// VIEW: ADMIN DASHBOARD
+function renderAdminDashboard(app, items) {
+  const stats = {
+    ok: items.filter(i => i.status?.name === 'ใช้งานได้').length,
+    repair: items.filter(i => i.status?.name === 'ส่งซ่อม').length,
+    broken: items.filter(i => i.status?.name === 'เสีย').length
+  };
+  app.innerHTML = `
+    <div class="min-h-screen bg-gray-50">
+      <header class="bg-white border-b px-6 py-4 flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Admin - Lab Asset</h1>
+        <a href="#/admin/item/new" class="btn btn-primary">+ เพิ่มอุปกรณ์ใหม่</a>
+      </header>
+
+      <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div class="bg-white p-5 rounded-xl border">
+            <p class="text-gray-500">ใช้งานได้</p>
+            <p class="text-3xl font-bold text-[#16A34A]">${stats.ok}</p>
+          </div>
+          <div class="bg-white p-5 rounded-xl border">
+            <p class="text-gray-500">ส่งซ่อม</p>
+            <p class="text-3xl font-bold text-[#F59E0B]">${stats.repair}</p>
+          </div>
+          <div class="bg-white p-5 rounded-xl border">
+            <p class="text-gray-500">เสีย</p>
+            <p class="text-3xl font-bold text-[#DC2626]">${stats.broken}</p>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl border overflow-hidden">
+          <div class="p-4 border-b">
+            <input type="text" placeholder="ค้นหา รหัส/SN/ชื่อ..."
+                   class="w-full md:w-80 px-4 py-2 border rounded-lg">
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left">
+              <thead class="bg-gray-50 text-sm">
+                <tr>
+                  <th class="p-4"><input type="checkbox"></th>
+                  <th class="p-4">รูป</th>
+                  <th class="p-4">รหัสเครื่อง</th>
+                  <th class="p-4">ชื่ออุปกรณ์</th>
+                  <th class="p-4">สถานะ</th>
+                  <th class="p-4">QR</th>
+                  <th class="p-4">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${db.items.map(item => `
+                  <tr class="border-t">
+                    <td class="p-4"><input type="checkbox"></td>
+                    <td class="p-4"><img src="${item.files[1]?.url}" class="w-12 h-12 object-cover rounded"></td>
+                    <td class="p-4 font-semibold">${item.asset_code}</td>
+                    <td class="p-4">${item.name}</td>
+                    <td class="p-4"><span class="chip ${getStatusColor(item.status)}">${item.status}</span></td>
+                    <td class="p-4"><button onclick="downloadQR('${item.id}')" class="text-[#2563EB]">↓</button></td>
+                    <td class="p-4 flex gap-2">
+                      <a href="#/admin/item/${item.id}" class="text-[#2563EB]">แก้</a>
+                      <button onclick="deleteItem('${item.id}')" class="text-[#DC2626]">ลบ</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <canvas id="qrCanvas" class="hidden"></canvas>
+  `;
+}
+
+function downloadQR(id) {
+  const url = `${location.origin}${location.pathname}#/item/${id}`;
+  QRCode.toCanvas(document.getElementById('qrCanvas'), url, { width: 300 }, function (error) {
+    if (error) return;
+    const link = document.createElement('a');
+    link.download = `qr-${id}.png`;
+    link.href = document.getElementById('qrCanvas').toDataURL();
+    link.click();
+  });
+}
+
+function deleteItem(id) {
+  if (!confirm('ลบอุปกรณ์นี้?')) return;
+  const db = getDB();
+  db.items = db.items.filter(i => i.id!== id);
+  saveDB(db);
+  router();
+}
+
+// VIEW: ADMIN FORM
+function renderAdminForm(app, id) {
+  const db = getDB();
+  const isNew = id === 'new';
+  const item = isNew? { id: crypto.randomUUID(), files: [], borrow_logs: [] } : db.items.find(i => i.id === id);
+
+
+
+  app.innerHTML = `
+    <div class="min-h-screen bg-gray-50">
+      <header class="bg-white border-b px-6 py-4">
+        <h1 class="text-2xl font-bold">${isNew? 'เพิ่มอุปกรณ์ใหม่' : 'แก้ไขอุปกรณ์'}</h1>
+      </header>
+
+      <form id="itemForm" class="p-6 max-w-6xl mx-auto">
+        <div class="bg-white rounded-xl border p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          ${input('รหัสเครื่อง*', 'asset_code', item.asset_code)}
+          ${input('ชื่ออุปกรณ์*', 'name', item.name)}
+          ${input('รุ่น', 'model', item.model)}
+          ${input('SN', 'serial_no', item.serial_no)}
+          ${select('ยี่ห้อ', 'brand', item.brand, db.brands)}
+          ${input('ขนาด', 'size', item.size)}
+          ${input('ราคา', 'price', item.price, 'number')}
+          ${input('วันที่ซื้อ', 'purchase_date', item.purchase_date, 'date')}
+          ${select('สถานะ', 'status', item.status, db.statuses)}
+          ${select('ที่เก็บ', 'location', item.location, db.locations)}
+          ${select('ผู้รับผิดชอบ', 'responsible', item.responsible, db.users)}
+          <div class="md:col-span-2">
+            ${textarea('หมายเหตุ', 'note', item.note)}
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl border p-6 mt-6">
+          <p class="font-semibold mb-3">ไฟล์แนบ</p>
+          <div class="border-2 border-dashed rounded-lg p-8 text-center text-gray-500">
+            ลากไฟล์มาวาง หรือกดอัปโหลด
+          </div>
+        </div>
+
+        <div class="flex gap-3 mt-6">
+          <button type="submit" class="btn btn-primary">บันทึก</button>
+          <button type="button" onclick="saveAndQR()" class="btn btn-primary">บันทึก + สร้าง QR</button>
+          <a href="#/admin" class="btn btn-secondary">ยกเลิก</a>
+        </div>
+      </form>
+    </div>
+  `;
+
+  document.getElementById('itemForm').onsubmit = (e) => {
+    e.preventDefault();
+    saveItem(item.id, isNew);
+  };
+}
+
+function input(label, name, value, type = 'text') {
+  return `
+    <div>
+      <label class="block text-sm font-semibold mb-1">${label}</label>
+      <input name="${name}" type="${type}" value="${value || ''}"
+             class="w-full px-4 py-2 border rounded-lg">
+    </div>
+  `;
+}
+
+function select(label, name, value, options) {
+  return `
+    <div>
+      <label class="block text-sm font-semibold mb-1">${label}</label>
+      <select name="${name}" class="w-full px-4 py-2 border rounded-lg">
+        ${options.map(o => `<option ${o === value? 'selected' : ''}>${o}</option>`).join('')}
+      </select>
+    </div>
+  `;
+}
+
+function textarea(label, name, value) {
+  return `
+    <div>
+      <label class="block text-sm font-semibold mb-1">${label}</label>
+      <textarea name="${name}" rows="3" class="w-full px-4 py-2 border rounded-lg">${value || ''}</textarea>
+    </div>
+  `;
+}
+
+function saveItem(id, isNew) {
+  const form = document.getElementById('itemForm');
+  const formData = new FormData(form);
+  const db = getDB();
+
+  const newItem = {
+    id,
+    asset_code: formData.get('asset_code'),
+    name: formData.get('name'),
+    model: formData.get('model'),
+    serial_no: formData.get('serial_no'),
+    brand: formData.get('brand'),
+    size: formData.get('size'),
+    price: Number(formData.get('price')),
+    purchase_date: formData.get('purchase_date'),
+    status: formData.get('status'),
+    location: formData.get('location'),
+    responsible: formData.get('responsible'),
+    note: formData.get('note'),
+    files: isNew? [] : db.items.find(i => i.id === id).files,
+    borrow_logs: isNew? [] : db.items.find(i => i.id === id).borrow_logs
+  };
+
+  if (isNew) {
+    db.items.push(newItem);
+  } else {
+    const idx = db.items.findIndex(i => i.id === id);
+    db.items[idx] = newItem;
+  }
+
+  saveDB(db);
+  location.hash = '#/admin';
+}
+
+function saveAndQR() {
+  const form = document.getElementById('itemForm');
+  form.dispatchEvent(new Event('submit'));
+  setTimeout(() => downloadQR(form.id || crypto.randomUUID()), 100);
+}
+
+window.addEventListener('hashchange', router);
+window.addEventListener('load', router);
+</script>
+</body>
+</html>
+Command Palette
+Search for a command to run...
+

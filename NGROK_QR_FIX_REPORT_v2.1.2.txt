@@ -1,0 +1,38 @@
+รายงานแก้ไขหน้า QR ผ่าน ngrok — Lab QR Asset Tracker v2.1.2
+วันที่: 7 สิงหาคม 2026
+
+1. ผลลัพธ์โดยสรุป
+- แก้หน้า QR สาธารณะที่โหลดข้อมูลไม่สำเร็จเมื่อเปิดผ่าน HTTPS ของ ngrok
+- แก้รูปภาพและเอกสารที่ยังอ้างถึง localhost:3001 จากเบราว์เซอร์ภายนอก
+- คงการทำงานแบบ local development ผ่านพอร์ต 5500/5501
+- ไม่มีการเปลี่ยน schema ฐานข้อมูลและไม่ต้องสร้าง migration ใหม่
+
+2. ไฟล์ที่เปลี่ยน
+- frontend/item.html
+- frontend/js/config.js
+- frontend/js/utils.js
+- frontend/js/pages/item.js
+- backend/tests/ngrok-public-qr.test.mjs
+- backend/package.json, backend/package-lock.json, docs/VERSIONS.md และ CHANGELOG.md
+
+3. ปัญหาและสาเหตุหลัก
+- หน้าเว็บอยู่บน HTTPS ของ ngrok แต่หน้า QR เรียก API ที่ http://localhost:3001
+- URL รูปเก่าบางรายการเป็น absolute URL ที่ชี้ localhost
+- เบราว์เซอร์จึงบล็อกด้วย Mixed Content, CORS และ loopback address protection
+- แก้โดยใช้ origin ปัจจุบันและแปลง URL loopback เก่าให้ชี้ origin เดียวกับหน้าเว็บ
+
+4. การตรวจสอบ
+- npm run verify
+- npx prisma validate และ npx prisma generate
+- npm audit --omit=dev
+- ตรวจ runtime URL ที่ hard-code localhost ในหน้าที่ได้รับผลกระทบ
+
+5. คำเตือนและขอบเขต
+- คำเตือน Tailwind CDN ไม่ใช่สาเหตุของ QR ล้มเหลว
+- WebSocket /ws จาก Live Server เป็นคนละส่วนกับ API
+- ต้องทดสอบสแกน QR จริงหลัง restart backend/ngrok และ refresh cache
+
+6. ขั้นตอนถัดไป
+- แทนที่ไฟล์ด้วย v2.1.2 โดยเก็บ .env และ uploads เดิม
+- Restart backend และ ngrok tunnel
+- กด Ctrl+F5 แล้วทดสอบ QR รูปภาพ และเอกสารแนบ

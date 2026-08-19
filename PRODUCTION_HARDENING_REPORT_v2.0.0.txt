@@ -1,0 +1,38 @@
+1. ผลลัพธ์โดยสรุป / Outcome
+
+- สถานะ: Partially verified
+- เพิ่มชั้นป้องกัน production รอบ API โดยไม่เปลี่ยน business workflow หรือ 52 endpoints เดิม
+- เพิ่ม health/readiness, request tracing, structured logging และ graceful fatal-event handling
+
+2. โครงสร้างหรือไฟล์ที่เปลี่ยน / Changes
+
+- config/env.js: production environment validation
+- middlewares/security.js: CORS policy และ security headers
+- middlewares/request-context.js: request ID และ JSON access log
+- middlewares/rate-limit.js: auth/API rate limit
+- routes/health.routes.js: liveness/readiness
+- errors.js และ server.js: safe errors และ fatal process lifecycle
+- docs/PRODUCTION.md และ .env.example
+
+3. ปัญหาและสาเหตุหลัก / Root cause
+
+- ก่อนหน้านี้ CORS เปิดกว้าง ไม่มี rate limit/request ID/readiness และ error บางจุดอาจส่ง internal message
+- แก้ด้วย global middleware ที่วางตามลำดับก่อน application routes และ production-only validation ที่ fail fast
+
+4. การตรวจสอบ / Verification
+
+- node --check: config, middleware, health, app และ server ผ่าน
+- npm run verify: syntax/local references และ regression tests ผ่าน
+- security tests: env/CORS/headers/rate limit/request ID/logging/health/safe error/process events
+- ยังไม่ได้ deploy หลัง HTTPS reverse proxy หรือทดสอบ load/penetration กับระบบจริง
+
+5. คำเตือนและงานคงเหลือ / Remaining items
+
+- Memory rate limiter ใช้ได้กับ Node instance เดียว; หลาย instance ต้องใช้ Redis
+- ต้องกำหนด CORS_ORIGINS และ TRUST_PROXY ให้ตรง deployment จริง
+- ต้องใช้ persistent volume และ backup PostgreSQL พร้อม uploads
+- CDN frontend libraries ยังต้องพิจารณา self-host/SRI หากนโยบาย production ห้ามพึ่ง CDN
+
+6. ขั้นตอนถัดไป / Next phase
+
+- ทำ deployment staging หลัง reverse proxy/HTTPS แล้วรัน HTTP smoke test, restore test และ load/security scan
